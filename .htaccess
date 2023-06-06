@@ -272,8 +272,8 @@ DirectoryIndex index.php index.html index.htm
 
   # 9A. To redirect HTTP requests to HTTPS, uncomment the lines below: 
   # -----------------------------------------------------------------------------------------------
-   RewriteCond %{HTTPS} !=on
-   RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+#   RewriteCond %{HTTPS} !=on
+#   RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 
   # 9B. If using load balancer/AWS, use the following rather than 9A above: (L)
