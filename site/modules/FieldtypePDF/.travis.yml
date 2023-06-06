@@ -1,0 +1,22 @@
+language: php
+
+php:
+    - 5.6
+
+env:
+    global:
+        secure: LcmdRBX5bX8BbpHewAlUwBCRAzCkUvS+XdvY5Bjlbg2NdbAsQ1nPJfGVVfP2wb/vKOeU++6eZASi6X0MWlm1mdCp/6/nu5jSnFrkP/rokddpsictSL2GyM/C9bp45MZpshy6DqY8zoEfKtu9ZvHtVccdErVRrVlOr3ebcfB2uiw=
+
+before_script:
+    - git config --global user.email "travis@travis-ci.org"
+    - git config --global user.name "Travis"
+
+script:
+    - echo "TODO testing"
+
+after_success:
+    - wget https://gist.githubusercontent.com/uiii/1fc5373c6f58ba29fb33/raw/generate-api.sh
+    - export REPO_SLUG=${TRAVIS_REPO_SLUG}
+    - export API_VERSION=${TRAVIS_BRANCH}
+    - if [ ${TRAVIS_PULL_REQUEST} = 'false' ]; then sh generate-api.sh; fi
+

@@ -1,0 +1,326 @@
+/**
+*
+* CSS styles for the Commercial ProcessWire Module Media Manager (Process)
+*
+* @author Francis Otieno (Kongondo) <kongondo@gmail.com>
+*
+* Copyright (C) 2015 by Francis Otieno
+*
+*/
+
+/** html **/
+/*## Prevent "jump" on shorter pages ##*/
+html {overflow-y:scroll;}
+
+
+/** heading **/
+div#top_pager h2.results_headline {float: left; margin: 0 0 1.5em 0;}
+
+/** div **/
+div#mm_tags_input_wrapper {margin-top: 1.75em; border-bottom: 1px dotted #d9e1ea; display: none;}
+div#ProcessListerResults div#action_pages {display: none !important;}/*ajax double output*/
+div#bottom_pager {margin: 1.25em 0; height: 3.125em;}
+div#mm_variations_submit {min-height: 45px;}
+
+/* @note: Modal Page Edit -> AdminTheme-specific styles */
+body.AdminThemeReno  div#mm_modal_single_page_edit {margin-bottom: 1.5em;}
+body.AdminThemeDefault   div#mm_modal_single_page_edit, body.AdminThemeDefault   div#action_pages {margin-top: 1em; margin-bottom: 3.5em;}
+
+div#top_pager::after, div#mm_variations_submit {
+	content: " ";
+	display: block;
+	clear: both;
+}
+
+div#mm_modal_single_page_edit {min-height: 40px;}
+
+div#mm_menu_actions_wrapper:after {/* clear float */
+	content: '\0020';
+	visibility: hidden;
+	display: block;
+	height: 0;
+	clear: both;
+}
+
+div#mm_actions.empty {width: 100%;}/*@TODO: WHAT?*/
+div.mm_exec {min-height: 600px;}
+div#bottom_pager {margin: 1.25em 0;	height: 3.125em;}
+div#media_live_sort_order_wrapper{display: inline-block;}
+
+div.media_stats {
+	min-height: 175px;
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	padding: 0 1em;
+	color: #858789;
+}
+
+div.media_stats:hover {background: rgba(0, 0, 0, 0.7); color: #A6A6A6;}
+
+div.mm_render_audio_player, div.mm_render_video_player {
+	background: rgba(0, 0, 0, 0.5);
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	width: 100%;
+}
+
+div.mm_render_video_player {bottom: -7px; background: none;}
+div.mm_render_audio_player:hover {background: rgba(0, 0, 0, 0.7); color: #A6A6A6;}
+
+
+/*## cleanup page ##*/
+div#components div.block {width: 25%;}
+
+div#components:after {/* clear blog-style div's float */
+	content: '\0020';
+	visibility: hidden;
+	display: block;
+	height: 0;
+	clear: both;
+}
+
+div#media_wrapper {position: relative;}
+div#media_view_switcher_sort {margin-bottom: 0.65em; padding-bottom: 1em; border-bottom: 1px dotted #ccc;}
+div.fixed ~ div#bottom_pager {padding-top: 3.25em;}
+
+/** headers **/
+h2.results_headline {float: left;}
+
+/** paragraph **/
+div.media_stats p {width: 100%;}
+p#final_selector, p#ProcessListerSelector {clear: both;}
+p.mm_unpublished,p.locked {color:red}
+
+/*## cleanup page ##*/
+div#components div#warning p {padding: 0.5em; font-size: 1.15em;}
+p#mm_filter_profiles_del_confirm_text {display: none; margin-top: 1em;}
+
+/** form **/
+form#mm_cleanup, form#settings {margin-top: 1.5em;}
+
+/** input **/
+/*## Actions Select ##*/
+select#mm_action_select {/*margin-right: 0.75em; */ width: 150px;}/*@TODO..WIP*/
+select#mm_action_select, label#mm_action_select_label {float: right;}/*@TODO..WIP*/
+table.mm_settings input {width: 100%}
+input#mm_action_tags {width: 100%; margin: 0.5em 0;}
+div#mm_tags_input_wrapper li input[type=radio] {margin-right:0.5em;}
+
+input[type=checkbox]#mm_confirm_overwrite_duplicate_media, input[type=checkbox]#mm_scan_delete_processed{
+	float: right;
+	width: 20px;
+	height: 20px;
+	vertical-align: bottom;
+	padding: 0;
+	margin: 0;
+	margin-left: 0.35em;
+	position: relative;
+	*overflow: hidden;
+}
+
+/** extras for overwrite media confirm (@note: to make sure overwriting of media is confirmed if that setting is available) **/
+form#fileupload.mm_confirm_media_overwrite button#start_upload,
+form#fileupload.mm_confirm_media_overwrite button#jfu_upload_actions_btns,
+form#fileupload.mm_confirm_media_overwrite button#pw-dropdown-toggle-jfu_upload_actions_btns,
+form#fileupload.mm_confirm_media_overwrite .jfu_start {
+	display: none !important;
+}
+
+/*## cleanup page ##*/
+input#remove_tpl_files {margin-left: 1em; position: relative; top: 0.3em;}
+input[type=checkbox]#media_live_sort_order {/*margin-left: 0.75em; */margin-right: 0.25em;}
+
+/** label **/
+
+/*## cleanup page ##*/
+label#remove_tf {margin: 0.75em 0 0 0.25em;display: inline-block; vertical-align: top;}
+
+label#media_live_sort_label, label#mm_action_select_label {/* margin-left: 1em;  */margin-right: 0.25em; }
+label#media_live_sort_label, label#mm_action_select_label {display: inline-block; vertical-align: top;}
+/*label#media_live_sort_order_label.mm_hide {display: none;}/* @TODO ..NOT REALLY NEEDED HERE*/
+p#mm_filter_profiles_del_confirm_text label {display:inline;}
+
+/** button **/
+button:focus {outline:0;}
+
+button:focus {outline:0;}
+/*## Actions 'Apply' Button ##*/
+button#mm_action_btn {
+	width: auto;
+	max-width: 100%;
+	border: none !important;
+	border-radius: 3px !important;
+	-moz-border-radius: 3px !important;
+	-webkit-border-radius: 3px !important;
+	float: right !important;
+	margin: 0;
+	font-size: 0.875em;
+}
+
+div#mm_modal_single_page_edit button.mm_action_save_page {
+	margin-right: 0;
+	margin-left: 10px;
+	margin-top: 0;
+	float: right;
+}
+
+button#mm_add_variations_btn{float: right;}
+
+/*## Actions 'Apply' Button ##*/
+/* @TODO..DO WE STILL NEED THIS? MAYBE IN OTHER THEMES BUT NOT UIKIT? */
+button#mm_action_btn,
+button#mm_add_btn{
+	display:inline-block;
+	display: block;
+	width: auto;
+	max-width: 100%;
+	border: none !important;
+	border-radius: 3px !important;
+	-moz-border-radius: 3px !important;
+	-webkit-border-radius: 3px !important;
+	/* float: right !important; */
+	margin: 0;
+	font-size: 0.875em;
+	margin-right: 0.75em;
+
+	margin-bottom: 1em;
+}
+button#mm_add_btn {float:right; position: absolute; top: -25px; right: 0; margin: 0;}
+button#mm_action_btn {display: none;}
+
+/**
+ * Don't show the save buttons when on the Add and Help Tabs *
+ * This works because WireTabs adds class names equal to the ID of the selected tab to the tab target container
+ *
+ */
+#MediaManagerTabsAdd button#mm_settings_btn,
+#MediaManagerTabsAdd button#mm_settings_btn,
+#MediaManagerTabsAdd div#head_button button#mm_settings_btn_copy,
+#MediaManagerTabsHelp div#head_button button#mm_settings_btn_copy {
+	display: none !important;
+	visibility: none;
+}
+
+/* @note: this is actually in JqueryFileUpload. In the modals /media-manager/rte/settings and /media-manager/rte/upload, the 'save' and 'start uploads' buttons respectively are getting a display:none applied to it by some script. We use this rule to override that*/
+button#start_upload, button#mm_settings_btn {display: initial !important;}
+
+/** image **/
+
+/** span **/
+span#insert_into_media_manager_field_spinner {font-size: 1.250em; display: none;}
+span.mm_variations_text {display: block; margin-bottom: 0.35em;}
+
+div.media img.in_field + input[type=checkbox] + span.thumb-meta {color:#749CBE;}
+span#insert_into_media_manager_field_spinner {font-size: 1.250em; display: none;}
+div.media_stats p span, div.accordion span:first-child, span.mm_settings  {font-weight: bold;}
+input[type=checkbox]#mm_confirm_overwrite_duplicate_media + span, input[type=checkbox]#mm_scan_delete_processed + span {float: right; margin-left: 0.5em;}
+
+/* @note: don't need to display the media title in this case since we can already see it */
+div.mm_render_audio_player span, div.mm_render_video_player span {display: none;}
+span.media_rte_link {display: none;}/*hidden anchors parent in rte mode; needed by JS*/
+span.close {
+	position:absolute;
+	right:15px;
+	top:10px;
+	cursor:pointer;
+}
+
+/** i **/
+span#insert_into_media_manager_field_spinner i {position: absolute; top: 20px; left: 50%;}
+
+/** list **/
+.content .MarkupPagerNav {list-style: outside none none; margin: 0;padding: 0;}
+
+ul.mm_menu {
+	width:100%;
+	padding:0;
+	margin:0;
+	list-style-type:none;
+}
+
+ul.mm_menu li {display: table-cell; width: 16.6666666%;  /* (100 / numItems)% */ text-align: center;}
+li.Inputfield_mm_filter_settings_save_btn,
+li.Inputfield_mm_filter_settings_save_exit_btn,
+li.Inputfield_mm_filter_profiles_go_btn,
+li.Inputfield_mm_edit_filter_config_btn  {
+	display: inline-block !important;
+}
+ul.mm_menu > li {display:inline;}
+li#mm_upload_settings ol li {margin-top: 0; margin-bottom: 0;}
+
+div#mm_tags_input_wrapper ul li {list-style: none}
+div#mm_tags_input_wrapper ul {padding-left: 0; margin-top: 0;}
+li.mm_locked {padding-left: 5px;}
+.content .MarkupPagerNav {list-style: outside none none; margin: 0; padding: 0;}
+
+/*## cleanup page ##*/
+div#components div.block ol li {margin: 0 0 0 20px; padding: 0;}
+
+ul#notices {display: none}
+
+/** anchor **/
+span.sel_all a {display: inline-block; font-size: 0.9em;}
+div.media span.unpublished a, table#tabular_view span.unpublished a {text-decoration: line-through;}
+div.media span.locked a, table#tabular_view span.locked a {color: #6b6d5f;}
+a.rte, a#media_rte_link, a.media_rte_link {display: none;}/*hidden anchors in rte mode; needed by JS*/
+a.mm_create_filter {display: block; margin-bottom: 15px;}
+div#mm_menu ul li a.mm_menu_item {height: initial}
+div#mm_menu ul li a:first-child {padding-left: 0}
+a.mm:hover {color:#A6A6A6;}
+div#mm_menu a.mm_on {color: #354b60; font-weight: bold}
+a:focus {outline:0;}
+div#ProcessListerTable tr.mm_in_field a {font-weight: normal;}
+div#mm_modal_single_page_edit a {cursor: pointer;}
+
+/** table **/
+table.mm_settings {width: 100%;}
+table.mm_settings th:nth-child(1) {width:14%;}
+table.mm_settings th:nth-child(2) {width:3%;}
+table.mm_settings th:nth-child(3) {width:4%;}
+table.mm_settings th:nth-child(4) {width:19%;}
+table.mm_settings th:nth-child(5) {width:60%;}
+div#ProcessListerTable tr.mm_in_field {background-color: #eee;}
+
+table#mm_extraimages_and_variations tr.mm_variation_image td {border-top: 5px solid transparent; }
+table#mm_extraimages_and_variations tr.mm_original_image td {position: relative}
+table#mm_extraimages_and_variations thead th:nth-child(2) {width: 16%;}
+table#mm_extraimages_and_variations thead th:nth-child(3),
+table#mm_extraimages_and_variations thead th:nth-child(4),
+table#mm_extraimages_and_variations thead th:nth-child(5) {
+	width: 27.33%;
+}
+
+table#mm_scan_list th.mm_scan_list_file_count {width: 150px;}
+table#mm_scan_list th.mm_scan_list_file_name {min-width: 150px}
+table#mm_scan_list th.mm_scan_list_file_size {width: 200px}
+table#mm_scan_list th.mm_scan_list_check_action {width: 150px}
+
+tr.mm_active_filter{font-weight: bold;}
+
+/** video **/
+div.mm_render_video_player video {width:50% !important; height: auto   !important; margin: 0 auto !important;}
+
+/** clear floats **/
+.clearfix:after {/* clear float */
+	content: '\0020';
+	visibility: hidden;
+	display: block;
+	height: 0;
+	clear: both;
+}
+
+/** button @TODO..delete if not in use **/
+
+/** small **/
+small#mm_active_filter {font-style: italic}
+h2.results_headline small {font-style: italic; font-size: 50%}
+
+/* Responsive Styles */
+@media only screen and (max-width: 767px) {
+	div#top_pager h2.results_headline {
+		float: none;
+	}
+}

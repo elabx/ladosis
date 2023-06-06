@@ -1,0 +1,500 @@
+<?php namespace ProcessWire;
+
+/**
+* Media Manager: Inputfield
+*
+* Inputfield that graphically displays a list/grid of a page's Media Manager manager.
+* Graphical User Interface for FieldtypeMediaManager.
+*
+* @author Francis Otieno (Kongondo) <kongondo@gmail.com> kongondo.com
+*
+* This is a Copyrighted Commercial Module. Please do not distribute or host publicly. The license is not transferable.
+*
+* InputfieldMediaManager for ProcessWire
+* Copyright (C) 2015 by Francis Otieno
+* Licensed under a Commercial Licence (see README.txt)
+*
+*/
+
+class InputfieldMediaManager extends Inputfield {
+
+	public static function getModuleInfo() {
+		return array(
+			'title' => 'Media Manager (Inputfield)',
+			'author' => 'Francis Otieno (Kongondo)',
+			'version' => 9,
+			'href' => 'http://mediamanager.kongondo.com',
+			'summary' => 'Media Manager: GUI (Inputfield) for FieldtypeMediaManager.',
+			'requires' => 'FieldtypeMediaManager',
+			);
+	}
+
+	protected $currentPage;
+
+
+	/* ######################### - SET UP - ######################### */
+
+	/**
+	 * Initialise the module. This is an optional initialisation method called before any execute methods.
+	 *
+	 * Initialises various class properties ready for use throughout the class.
+	 *
+	 * @access public
+	 *
+	 */
+	public function init() {
+
+		parent::init();
+
+		#$this->wire('modules')->getInstall("JqueryMagnific");
+
+		// needed for lightbox gallery for image media (i.e. the blueimp gallery; not the upload features!)
+		$config = $this->wire('config');
+		$jfuURL = $config->urls->JqueryFileUpload;
+		$config->scripts->add($jfuURL . "js/gallery/jquery.blueimp-gallery.min.js");
+		$config->styles->add($jfuURL . 'css/blueimp-gallery.min.css');
+
+		$modules = $this->wire('modules');
+		$modules->get("Jquery");
+		$ui = $modules->get("JqueryUI");
+		$ui->use("modal");
+		$modules->get("JqueryMagnific");
+
+	/*	@note: moved to $this->render() to help with compatibility of field in repeaters. @see note in $this->renderMedia()
+		// so that we can get the $page->ID
+		$process = $this->wire('process');
+		if($process && $process->className() == 'ProcessPageEdit') $this->currentPage = $process->getPage();// get the page being edited
+
+	 */
+
+	}
+
+	public function setPage(Page $page) {
+		$this->page = $page;
+	}
+
+	public function setField(Field $field) {
+		$this->field = $field;
+	}
+
+	/* ######################### - INPUTFIELD STUFF - ######################### */
+
+	/**
+	 * Inputfield's configurations.
+	 *
+	 * This is appended to the Input Tab.
+	 *
+	 * @access public
+	 * @return $inputfields.
+	 *
+	 */
+	public function ___getConfigInputfields() {
+
+		$inputfields = parent::___getConfigInputfields();
+
+
+
+		// for specifying text label for modal link. Default is 'Add Pages'
+		// this appears in the page being edited
+		$f = $this->wire('modules')->get("InputfieldText");
+		$f->attr('name', 'modalLinkLabel');
+		$f->attr('value', $this->modalLinkLabel ? $this->modalLinkLabel : $this->_('Add Media'));
+		$f->label = $this->_('Modal Link Label');
+		$f->description .= $this->_('Text label to show for the modal link for adding media to the page.');
+		$f->notes = $this->_('Default is: Add Media.');
+
+		$inputfields->append($f);
+
+		return $inputfields;
+
+	}
+
+	/* ######################### - MARKUP RENDERERS - ######################### */
+
+	/**
+	 * Render the entire markup returned for the Media Manager field.
+	 *
+	 * @access public
+	 * @return $out String Markup of actions and media thumbnails.
+	 *
+	 */
+	public function ___render() {
+
+		// in that case, will need to get the ID of the repeate page in which the MM field actually resides
+
+		// first, we check if our field is in a repeater
+		preg_match('/(_repeater[0-9]+)$/', $this->name, $match);
+		// if in a repeater, we adjust our 'current' page accordingly => it will be the repeater page
+		// that's where our media will live for this page
+		if(count($match)) {
+			$repeatPageID = (int) str_replace('_repeater', '', $match[0]);
+			$this->currentPage = $this->wire('pages')->get($repeatPageID);
+		}
+
+		// our media will live directly in the page currently being edited
+		else {
+
+			// so that we can get the $page->ID
+			$process = $this->wire('process');
+			if($process && $process->className() == 'ProcessPageEdit') $this->currentPage = $process->getPage();// get the page being edited
+		}
+
+		// @note: important to use $this->field->name here. @see notes in $this->renderMedia()
+		$currentField = $this->wire('fields')->get($this->field->name);
+
+		### build the thumbnails view ###
+
+		$view = $this->setViewMode();// get our view mode (grid vs list)
+
+		$out = '';
+		$out .= $this->renderActionsStrip($this->currentPage, $currentField);// the actions panel/strip above thumbnails with views, add pages, select all, etc actions.
+
+		$divWrapperID = 'media_manager_' . $this->name;
+
+		$out .= '<div id="' . $divWrapperID . '" class="sortable">';// make it sortable/draggable
+
+		// saved media manager values (in this Fieldtype)
+		$values = $this->attr('value');
+
+		if(!count($values)) $out .= '<h4>' . $this->_('Nothing added yet') . '</h4>';
+
+		$classHeaders = $view == 'grid' ? 'hide' : '';
+		$out .= "<div class='page_media_headers $classHeaders'>" .
+					"<span class='header_thumb'>Thumb</span>" .
+					"<span class='header_title'>Title</span>" .
+					"<span class='header_name'>Name</span>" .
+					"<span class='header_desc'>Description</span>" .
+					"<span class='header_tags'>Tags</span>" .
+				"</div>";
+
+
+		$out .= $this->renderMedia();
+
+		$out .= '</div>';
+
+		#$mediaWrapperID = 'Inputfield_' . $this->field->name;// in case we have more than one of FieldtypeMediaManager on this page, we create a unique ID
+		// @note: for compatibility with repeaters. @see note in $this->renderMedia()
+		$mediaWrapperID = 'Inputfield_' . $this->name;// in case we have more than one of FieldtypeMediaManager on this page, we create a unique ID
+
+		$out = '<div id="' . $mediaWrapperID . '" class="clearfix media_thumbs"> ' . $out . '</div>';
+
+		// needed for lightbox gallery for image media (i.e. the blueimp gallery; not the upload features!)
+		$jfu = new JqueryFileUpload();
+		$out .= $jfu->renderGalleryWidget(false);
+
+		return $out;
+
+	}
+
+	/**
+	 * Build media thumbs grid/list.
+	 *
+	 * @access private
+	 * @return $out String Markup of media thumbs grids.
+	 *
+	 */
+	private function renderMedia() {
+
+		// we'll need this field's name in the 'add media' modal (for ProcessMediaManager)
+		#$fn = $this->field->name;
+		// to make compatible with use in repeaters, we get the name instead
+		// $this->field->name would return 'media_manager_field_name'
+		// $this->name would return 'media_manager_field_name_repeater1234' => this is what we are after
+		$fn = $this->name;
+
+		// prefix for input 'name' [in case more than 1 field of this type on this page/template]
+		$n = 'media_manager_' . $fn;
+
+		$out = '';
+
+		// saved media manager values (in this Fieldtype)
+		$values = $this->attr('value');// a MediaManagerArray
+
+		$commonExts = $this->commonExtensions();// use for non-image media to check for media thumbs
+		$mediaThumbURL = '';
+		$config = $this->wire('config');
+		$adminURL = $config->urls->admin;
+		$currentPage = $this->currentPage;
+		// for image media only: lightbox gallery of images
+		$faZoom = '<i class="fa fa-fw fa-search-plus media_image_zoom"></i>';// @todo: fix to work in thumbs list view as well
+
+		$view = $this->setViewMode();// get our view mode (grid vs list)
+
+		/*
+			- @note: $m here is a MediaManager Object
+			- It has 5 properties:
+
+				DATABASE
+				1. id => pageID of the page where the media lives
+				2. type => integer denoting media type (1=audio; 2=document; 3=image; 4=video)
+
+				RUNTIME
+				3. typeLabel => user friendly string denoting media type (audio, document, image, video)
+				4. media => a ProcessWire Image/File Object including all their properties
+				5. title => title of media (@note: this is the title of the page with the media; not the name of the file!)
+
+		 */
+
+		foreach ($values as $m) {
+
+			$title = $m->title;
+
+			if(mb_strlen($title, 'UTF-8') > 20) $title = mb_substr($title, 0, 15, 'UTF-8') . '&hellip;';// truncate longer titles
+
+			if(($m->type == 3) || (strlen($m->type) > 1 && (int)substr($m->type, 0, 1) === 3)) $media = $m->media;// not an array since we saved specific images
+			else $media = $m->media->first();// non-image single file field behaves as array in module context
+
+			set_time_limit(60);// want to avoid script timing out due to potentially resource intensive image cropping (thumb creation) [assuming function not disabled by host]
+			$out .= "<div class='page_media_wrapper $view'>
+						<div class='page_media'>";
+
+			// @todo: allow cropping here also?
+			// @todo: allow editing here also or link to edit
+
+			$imageGalleryIcon = '';
+			// determine thumbs to show
+			// if media is of type image, we show its thumb
+			if(($m->type == 3) || (strlen($m->type) > 1 && (int)substr($m->type, 0, 1) === 3)) {
+				$mediaURL = $m->media->url;
+				$mediaThumbURL = $media->size(100,75)->url;
+				$imageGalleryIcon = "<div class='media_image_zoom'>" .
+						"<span>" .
+							//"<a href='" . $mediaURL . "' data-gallery class='media_image_zoom' title='" . $title . "'>" . $faZoom . "</a>" .
+							// for repeater compatibility
+							"<a href='" . $mediaURL . "' data-gallery='" . $n . "' class='media_image_zoom' title='" . $title . "'>" . $faZoom . "</a>" .
+						"</span>" .
+					"</div>";
+			}
+			// else get thumbs of common extensions if available
+			elseif(in_array($media->ext, $commonExts)) {
+				$customUserIcon = $config->paths->assets . 'MediaManager/assets/' . $media->ext . '.png';
+				// use user's custom thumb for this media format
+				if(is_file($customUserIcon)) $mediaThumbURL = $config->urls->assets . 'MediaManager/assets/' . $media->ext . '.png';
+				// use MM's custom thumb for this media format
+				else $mediaThumbURL = $config->urls->ProcessMediaManager  . 'assets/' . $media->ext . '.png';
+			}
+			// if not, get generic thumbs
+			else $mediaThumbURL = $this->genericThumb($m->type);
+
+			$class = $m->typeLabel;
+
+			$dataValue = $m->id . '_' . $m->type;
+			$dataWrapper = 'media_manager_' . $this->name;
+
+			$out .= "<span class='media_thumb'><img src='$mediaThumbURL' title='$media->basename' data-value='$dataValue' data-wrapper='$dataWrapper' class='$class'></span>";
+			$out .=			$imageGalleryIcon . // for lightbox gallery
+							"<span class='media_title' title='$m->title'>$title</span>" .
+							"<span class='media_name'>$media->basename</span>" .
+							"<span class='media_desc'>$media->description</span>" .
+							"<span class='media_tags'>$media->tags</span>" .
+							"<input type='checkbox' class='thumb'  id='media-{$dataValue}' name='sel_media' value='$dataValue'>" .
+							"<input type='hidden' name='" . $n . "[]' value='$dataValue'>" .
+						"</div>" .
+					"</div>";
+		}
+
+		return $out;
+
+	}
+
+	/**
+	 * Builds the action links above the thumbnail display in render/page-edit.
+	 *
+	 * @param $currentPage Page Object The page currently being edited. Needed for modal view.
+	 * @param $currentField Object The current field of type FieldtypeMediaManager selected on this current page.
+	 * @access private
+	 * @return $actions String.
+	 *
+	 */
+	private function renderActionsStrip($currentPage, $currentField) {
+
+		$url = $this->wire('config')->urls->admin . 'media-manager/add/';// ProcessMediaManager landing page. Note: ajax call set separately there in ajaxConfigs()
+
+		// add currentPage->id & currentField->id segment {combining IDs of page and field ids}
+		$url .= $currentPage->id . '-' . $currentField->id;
+
+		// add modal context
+		$url .= '/?modal=1';
+
+		$addPagesLabel = $this->modalLinkLabel ? $this->wire('sanitizer')->entities($this->modalLinkLabel) : $this->_('Add Media');
+
+  		$mm = "<a href='$url' title='" . $this->_('Insert media') . "' class='add_media pw-modal pw-modal-medium'>". $addPagesLabel ."</a>";
+
+  		// show used media counts for this field in cases where max files is limited
+  		if((int)$this->maxFiles){
+  			$currentFieldCnt = $currentPage->$currentField->count();
+  			// if max files of media allowed reached, do not display 'add media' link
+  			if($this->maxFiles === (int)$currentFieldCnt || (int)$currentFieldCnt > $this->maxFiles) $mm = '<small class="media_field_full">' . $this->_('Media field full') . '</small>';
+  			$mm .= '<small class="media_count"><span>' .  $this->_('Used: ') . '</span>' . $currentFieldCnt  . '/' . $this->maxFiles . '</small>';
+  		}
+
+  		// show list of allowed media types if 'allowed media' is in effect
+  		if($this->allowedMedia != null && count($this->allowedMedia)) {
+  			$mm .= '<small class="media_allowed"><span>' .  $this->_('Allowed media types: ') . '</span>' . $this->allowedMediaTypesStr() . '</small>';
+  		}
+
+  		else {
+  			$mm .= '<small class="media_allowed"><span>' .  $this->_('Allowed media types: ') . '</span>' .
+  					$this->_('audio, document, image, video') . '</small>';
+  		}
+
+		#$mediaWrapperID = 'Inputfield_' . $this->field->name;
+		$mediaWrapperID = 'Inputfield_' . $this->name;// @note: for repeater compatability. @see note in $this->renderMedia()
+
+		$actions = '<div class="actions_wrapper">';
+		$actions .= '<div class="actions_add">' .
+						'<a data-media="' . $mediaWrapperID  . '" class="views grid_view" href="#" title="' . $this->_('Grid View') . '"><i class="fa fa-th"></i></a>' .
+						'<a data-media="' . $mediaWrapperID  . '" class="views list_view" href="#" title="' . $this->_('List View') . '"><i class="fa fa-list"></i></a>' .
+						$mm .
+					'</div>';
+
+		$actions .= '<div class="actions_remove">' .
+						'<a data-media="' . $mediaWrapperID  . '" class="media_remove views" href="#" title="' . $this->_('Trash Selected') . '">' .
+							'<i class="fa fa-trash-o media_trash"></i>' .
+						'</a>' .
+						'<a data-media="' . $mediaWrapperID  . '" class="unselect_all sel_all" href="#">' . $this->_('Unselect All') . '</a>' .
+						'<a data-media="' . $mediaWrapperID  . '" class="select_all sel_all" href="#">' . $this->_('Select All') . ' &#47;</a>' .
+					'</div>' .
+					'</div>';
+
+		return $actions;
+
+	}
+
+	/* ######################### - MEDIA UTILITIES - ######################### */
+
+	/**
+	 * Common extensions of audio, document and video media/formats.
+	 *
+	 * Use this for applying custom thumbs to know types.
+	 *
+	 * @access private
+	 * @return $commonExts Array of strings of extensions of popular media formats.
+	 *
+	 */
+	private function commonExtensions() {
+		$commonExts = array('mp3','wav','ogg','m4a','m4p','flac','wma', 'pdf','doc','docx','xls','xlsx', 'ppt', 'pptx', 'mp4','avi','mkv', 'mpg', 'mov','wmv','m4v');
+		return $commonExts;
+	}
+
+	/**
+	 * Generic thumb for audio, document, image and video media.
+	 *
+	 * We use these in case a media format is not part of popular/common media formats or for image media, no image found.
+	 *
+	 * @access private
+	 * @param $mediaType Integer denoting media type.
+	 * @return $thumb String URL of generic thumb.
+	 *
+	 */
+
+	private function genericThumb($mediaType) {
+
+		$baseURL = $this->wire('config')->urls->ProcessMediaManager . 'assets/';
+		$thumb = '';
+
+		if($mediaType == 1)     $thumb = $baseURL . 'no-audio-thumb.png';
+		elseif($mediaType == 2) $thumb = $baseURL . 'no-document-thumb.png';
+		elseif($mediaType == 3) $thumb = $baseURL . 'no-image-thumb.png';
+		elseif($mediaType == 4) $thumb = $baseURL . 'no-video-thumb.png';
+
+		return $thumb;
+	}
+
+	/**
+	 * Determines and sets the user-selected view mode for thumbnails in render/page-edit.
+	 *
+	 * Gets cookie set in InputfieldMediaManager.js.
+	 *
+	 * @access private
+	 * @return $view String.
+	 *
+	 */
+	private function setViewMode() {
+
+		$view = 'grid';// default view
+		//$cookieName = 'Inputfield_' . $this->field->name . '_view';
+		$cookieName = 'Inputfield_' . $this->name . '_view';// @note for repeater compatability
+		$viewCookie = $this->wire('input')->cookie->$cookieName;// js cookie to remember thumbs' view for session
+		if(0 === (int) $viewCookie) $view = 'grid';
+		elseif(1 === (int) $viewCookie) $view = 'list';
+
+		return $view;
+
+	}
+
+	/**
+	 * Returns string showing allowed media types for this field.
+	 *
+	 * Shown only if allowedMedia is set.
+	 *
+	 * @access private
+	 * @return $mediaTypesStr String of allowed media types.
+	 *
+	 */
+	private function allowedMediaTypesStr() {
+
+		$mediaTypes = array(
+								1 => $this->_('audio'),
+								2 => $this->_('document'),
+								3 => $this->_('image'),
+								4 => $this->_('video')
+		);
+
+		$mediaTypesInt = $this->allowedMedia;
+		$mediaTypesStr = '';
+
+		foreach ($mediaTypesInt as $m) {
+			if(isset($mediaTypes[$m])) $mediaTypesStr.= $mediaTypes[$m] . ', ';
+		}
+
+		return rtrim($mediaTypesStr, ', ');
+
+	}
+
+	/* ######################### - PROCESS ACTIONS - ######################### */
+
+	/**
+	 * Process input for the values sent from this field.
+	 *
+	 * @access public
+	 *
+	 */
+	public function ___processInput(WireInputData $input) {
+
+
+		if(!$this->page || !$this->field) throw new WireException("This inputfield requires that you set valid 'page' and 'field' properties to it.");
+
+		$name = 'media_manager_' . $this->attr('name');
+
+		$media = $this->field->type->getBlankValue($this->page, $this->field);
+
+		// only loop through if we have values
+		if(count($input->{"{$name}"})) {
+			// $idType[0] == pageID; $idType[1] == media type
+			foreach($input->{"{$name}"} as $value) {
+				$idType = explode('_', $value);
+				// create a new MediaManager and add it to the MediaManagerArray
+				$m = new MediaManager();
+				$m->id = (int) $idType[0];// don't really need to sanitize here as well since done in MediaManager::set()
+				$m->type = (int) $idType[1];// -ditto-
+				$media->add($m);
+			}
+		}
+
+		// if the string values of the processed media are different from the previous,
+		// or if any media have been deleted, then flag this Inputfield as changed
+		// so that it will be automatically saved with the page
+
+		// if things have changed, we take the new values
+		if("$media" != "$this->value") {
+				$this->attr('value', $media);
+				$this->trackChange('value');
+		}
+
+
+	}
+
+
+}
+

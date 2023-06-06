@@ -1,0 +1,1062 @@
+<?php
+
+/**
+ * TODO BEFORE RELEASING THE MODULE:
+ * - remove bd() call (TracyDebugger)
+ * - remove the permission check (for PwCron)
+ * -
+ * //https://raw.githubusercontent.com/somatonic/PWOnlineInstaller/master/grabpw.php
+ *
+ *
+ */
+
+require_once(wire('config')->paths->Duplicator . 'Classes/define.php');
+require_once(wire('config')->paths->Duplicator . 'Classes/utility.php');
+require_once(wire('config')->paths->Duplicator . 'Classes/Logs.php');
+require_once(wire('config')->paths->Duplicator . 'Classes/FTPClient.php');
+require_once(wire('config')->paths->Duplicator . 'Classes/DropboxClient.php');
+require_once(wire('config')->paths->Duplicator . 'Classes/GoogleDriveClient.php');
+require_once(wire('config')->paths->Duplicator . 'Classes/AmazonS3Client.php');
+
+
+class Duplicator extends WireData implements Module, ConfigurableModule
+{
+    const minVersion = '2.8.0';
+
+    protected static $_data;
+    protected $backupLock;
+    protected $logSession;
+
+    public static function getModuleInfo()
+    {
+        return array(
+            'title' => 'Duplicator',
+            'version' => DUP_VERSION,
+            'summary' => 'Duplicate, backup and transfer an entire site from one location to another.',
+            'author' => 'flydev',
+            'href' => 'https://processwire.com',
+            'singular' => true,
+            //'autoload' => true,
+            'autoload' => function () {
+                return ((wire('input')->get->name == __CLASS__) !== FALSE && wire('page')->template == 'admin');
+            },
+            'icon' => 'clone'
+        );
+    }
+
+    protected static function getDefaultData()
+    {
+        return array(
+            'localPath' => '',
+            'defaultLocalPath' => '',
+            'backups' => 1,
+            'backupSessions' => 1,
+            'ignoredPath' => '',
+            'packageName' => '',
+            'cycle' => 'everyHour',
+            'deadline' => 'never',
+            // max number of packages (locally or cloud stored packages)
+            'maxPackages' => DUP_MAX_PACKAGES,
+            'removeBackups' => '1',
+            // encryption packages
+            //'useEncryption'     => 1,
+            //'encryptionKey'     => 0,
+            // CRON mode
+            'cronMode' => 'none',
+            // storage mode
+            'useLocalFolder' => 1,
+            'useFTP' => 0,
+            'useGoogleDrive' => 0,
+            'useDropbox' => 0,
+            'useAmazonS3' => 0,
+            // FTP
+            'ftpHostname' => '',
+            'ftpPort' => '',
+            'ftpUsername' => '',
+            'ftpPassword' => '',
+            'ftpDirectory' => '',
+            'ftpTimeout' => '',
+            'ftpSSL' => 0,
+            'ftpPassive' => 1,
+            // API Google
+            'googleDriveClientId' => '',
+            // JSON key file
+            'googleKeyFile' => '',
+            // Email for sharing files upon upload
+            'shareWithEmail' => '',
+            // API Dropbox
+            'dropboxAccessToken' => '',
+            // API Amazon
+            'awsAccessKey' => '',
+            'awsSecretKey' => '',
+            'awsBucketName' => '',
+            'awsRegion' => ''
+        );
+    }
+
+    public function save()
+    {
+        $data = wire('modules')->getModuleConfigData($this);
+
+        foreach ($data as $name => $value)
+            $data[$name] = $this->$name;
+
+        self::$_data = $this;
+
+        wire('modules')->saveModuleConfigData($this, $data);
+
+        return $data; // or return true or whatever you like
+    }
+
+
+    public function __construct()
+    {
+        $this->setArray(self::getDefaultData());
+        self::$_data = $this;
+
+        if (wire('input') && wire('input')->get('name') == __CLASS__) {
+            $root = $this->config->urls->siteModules . __CLASS__;
+            $this->config->styles->prepend($root . '/' . __CLASS__ .'.css');
+            $this->config->scripts->add($root . '/' .  __CLASS__ . '.js');
+        }
+
+        $this->moduleDir = $this->config->paths->siteModules . $this->className;
+
+        //if ($this->input && $this->input->get->name == $this->className) {
+            $this->config->styles->add($this->config->urls->{$this->className} . "{$this->className}.css");
+            $this->config->scripts->add($this->config->urls->{$this->className} . "{$this->className}.js");
+        //}
+
+
+        $this->defaultLocalPath = wire('config')->paths->assets . DUP_DEFAULT_LOCAL_FOLDER;
+        if (!is_dir($this->defaultLocalPath) && empty($this->localPath)) {
+            wireMkdir($this->defaultLocalPath);
+        }
+
+        $this->ignoredPath = wire('config')->paths->assets . DUP_DEFAULT_LOCAL_FOLDER;
+
+        if (strlen($this->localPath == 0)) {
+            $this->localPath = $this->defaultLocalPath;
+        }
+
+        $this->maxPackages = ($this->maxPackages && $this->maxPackages <= DUP_MAX_PACKAGES) ? $this->maxPackages : DUP_MAX_PACKAGES;
+
+        //throw new WireException("gotcha!");
+    }
+
+    public function init()
+    {
+        if (empty($this->localPath)) {
+            $this->localPath = $this->defaultLocalPath;
+        }
+
+        if (!is_dir($this->localPath) && !empty($this->localPath)) {
+            wireMkdir($this->localPath);
+        }
+
+        if (empty($this->packageName)) {
+            $this->packageName = str_replace('-', '_', $this->config->httpHost);
+        }
+
+        $action = $this->sanitizer->pageName($this->input->get->action);
+        switch ($action) {
+            case 'backup_now': {
+                $e = new HookEvent();
+                $this->cronJob($e);
+                //$this->session->redirect($this->config->urls->admin . 'module/edit?name=' . $this->className . '&collapse_info=1');
+                break;
+            }
+
+            case 'clean_packages':
+                DUP_Util::clean($this->localPath, 0);
+                break;
+
+            case 'none':
+                break;
+
+            case 'warning': {
+                if(!empty($this->input->get->msg))
+                    $this->warning(($this->sanitizer->text($this->input->get->msg)));
+                break;
+            }
+
+            case 'error': {
+                $this->error(($this->sanitizer->text($this->input->get->msg)));
+                break;
+            }
+
+            case 'view_listing':
+                echo $this->renderModalPackagesFound();
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    public function ready()
+    {
+        switch($this->cronMode) {
+            case 'LazyCron':
+                if (!$this->modules->isInstalled('LazyCron')) {
+                    $this->warning('You must install the core module LazyCron .');
+                } else {
+                    if ($this->cycle == 'logoutTrigger') {
+                        $this->addHookBefore("Session::logout", function () {
+                            if (!$this->wire('user')->hasPermission('duplicator')) return;
+                            $e = new HookEvent();
+                            $this->cronJob($e);
+                        });
+                    } elseif ($this->cycle == 'submitTrigger') {
+                        $this->addHookBefore("InputfieldSubmit::processInput", function (HookEvent $event) {
+                            if (!$this->wire('user')->hasPermission('duplicator')) return;
+                            $e = new HookEvent();
+                            $this->cronJob($e);
+                        });
+                    } elseif ($this->cycle) {
+                        $this->addHook("LazyCron::{$this->cycle}", $this, 'cronJob');
+                    }
+                }
+                break;
+
+            case 'PWCron':
+                if (!$this->modules->isInstalled('PwCron')) {
+                    $this->warning("You must install the module PWCron. Please read the duplicator's readme");
+                } else {
+                    $this->addHook('PwCron::cronHook', $this, 'cronJob');
+                }
+                break;
+
+            case 'none':
+            default:
+                break;
+        }
+    }
+
+    public function ___install()
+    {
+        if (version_compare($this->config->version, self::minVersion, '<'))
+            throw new WireException("This module requires ProcessWire " . self::minVersion . " or newer.");
+    }
+
+    public function ___uninstall()
+    {
+        $path = str_replace($this->config->paths->root, '/', $this->localPath);
+        $this->warning("Please note that package files in {$path} remain. You may remove them manually.");
+
+    }
+
+    protected function buildProcessWireBackup($options = array())
+    {
+        $defaultOptions = array(
+            'filename' => DUP_Util::formatFilename(wire('config')->httpHost, 'pw' . strrchr(DUP_PACKAGE_EXTENSION, '.')),
+            'folder' => wireTempDir(DUP_TEMP_FOLDER),
+            'exclude' => array(),
+            'extension' => array()
+            //'allowHidden'   => true
+        );
+
+        $options = array_merge($options, $defaultOptions);
+        $root = str_replace('/', DIRECTORY_SEPARATOR, wire('config')->paths->root);
+        $path = str_replace('/', DIRECTORY_SEPARATOR, wire('config')->paths->root . DUP_SITE_FOLDER . DIRECTORY_SEPARATOR . basename(wire('config')->paths->assets) . DIRECTORY_SEPARATOR);
+
+        if ($this->backupWire) array_push($options['exclude'], $root . 'wire');
+        if ($this->backups) array_push($options['exclude'], $path . 'backups');
+        if ($this->backupLogs) array_push($options['exclude'], $path . 'logs');
+        if ($this->backupCache) array_push($options['exclude'], $path . 'cache');
+        if ($this->backupSessions) array_push($options['exclude'], $path . 'sessions');
+        if ($this->backupFiles) array_push($options['exclude'], $path . 'files');
+
+        $excluded = preg_split('/\r\n|[\r\n]/', $this->ignoredPath);
+        $options['exclude'] = array_merge($options['exclude'], $excluded);
+
+        foreach ($options['exclude'] as $option) {
+            if(!empty($option)) {
+                $validExt = ($option[0] === '*' && $option[1] === '.') ? $option : '';
+                $ext = substr(strchr($validExt, '.'), 1);
+                if (!empty($ext)) array_push($options['extension'], $ext);
+                if(is_dir($root . $option)) {
+                    array_push($options['exclude'], $root . $option);
+                } elseif(is_file($root . $option)) {
+                    array_push($options['exclude'], $root . $option);
+                }
+            }
+        }
+
+        foreach ($this->ignoredExtensions as $ignoredExtension) {
+            $validExt = substr(strchr($ignoredExtension, '.'), 1);
+            if(!empty($validExt)) array_push($options['extension'], $validExt);
+        }
+
+
+        if (!is_dir($options['folder']) || !is_writable($options['folder'])) {
+            DUP_Logs::log('Could not create temporary directory: ' . $options['folder']);
+            return false;
+        }
+
+        $zipfile = $options['folder'] . $options['filename'];
+        //$options['folder']->setRemove(true);
+        //$result = wireZipFile($zipfile, wire('config')->paths->root);
+        //@ini_set('memory_limit', '-1');
+        //DUP_Util::zipData(wire('config')->paths->root, $zipfile, $options);
+        DUP_Util::zipData(wire('config')->paths->root, $zipfile, $options);
+        if (!file_exists($zipfile)) {
+            DUP_Logs::log("An error occured while building the ProcessWire structure.");
+            return false;
+        }
+
+        return $zipfile;
+    }
+
+    protected function buildDatabaseBakcup(array $options = array())
+    {
+        try {
+            $defaultOptions = [
+                'path' => wireTempDir(DUP_TEMP_FOLDER),
+                'backup' => array(
+                    'filename' => DUP_Util::formatFilename(wire('config')->dbHost, 'sql'),
+                    'description' => '', //$this->backupFileinfo(),
+                    'maxSeconds' => 120
+                )
+            ];
+
+            $options = array_merge($options, $defaultOptions);
+
+            $backup = new WireDatabaseBackup($options['path']);
+            $backup->setDatabase($this->database);
+            $backup->setDatabaseConfig(wire('config'));
+            $sqlfile = $backup->backup($options['backup']);
+
+            if ($sqlfile) {
+                $zipfile = $options['path'] . $options['backup']['filename'] . '.zip';
+                $result = wireZipFile($zipfile, $sqlfile);
+                DUP_Util::deleteFile($sqlfile);
+                $errors = $result['errors'];
+                //$cnt = count($result['files']);
+                foreach ($errors as $error) {
+                    DUP_Logs::log("ZIP add failed: $error");
+                }
+                if (file_exists($zipfile)) return $zipfile;
+            }
+        } catch (\Exception $ex) {
+            DUP_Logs::log("An error occured: " . $ex->getMessage());
+        }
+        return false;
+    }
+
+    protected function buildPackage(array $options = array())
+    {
+        $defaultOptions = array(
+            'filename' => DUP_Util::formatFilename(str_replace('-', '_', $this->packageName), 'package.zip'),
+            'path' => $this->localPath
+        );
+
+        $options = array_merge($options, $defaultOptions);
+        try {
+            $dbbackup = $this->buildDatabaseBakcup();
+            if ($dbbackup == false) {
+                DUP_Logs::log("An error occured during database backup.");
+                return false;
+            }
+
+            //$pwbackup = $this->buildProcessWireBackup2($options['path'], $options['filename'], $this->config->paths->httpRoot, 'test');
+            $pwbackup = $this->buildProcessWireBackup();
+            if ($pwbackup == false) {
+                DUP_Logs::log("An error occured during package build.");
+                return false;
+            }
+
+            $files = array(
+                $dbbackup,
+                $pwbackup
+            );
+
+            $zipfile = $options['path'] . DIRECTORY_SEPARATOR . $options['filename'];
+
+            $result = wireZipFile($zipfile, $files);
+            foreach ($files as $file) {
+                DUP_Util::deleteFile($file);
+            }
+
+            foreach ($result['errors'] as $error) {
+                DUP_Logs::log("ZIP add failed: $error");
+            }
+
+            if (file_exists($zipfile)) {
+
+                return $zipfile;
+            }
+        } catch (\Exception $ex) {
+            DUP_Logs::log($ex->getMessage());
+        }
+
+        return true;
+    }
+
+    public function cronJob($event)
+    {
+        if (!$this->useLocalFolder && !$this->useGoogleDrive && !$this->useDropbox && !$this->useAmazonS3 && !$this->useFTP) {
+            return false;
+        }
+
+        ignore_user_abort(true);
+        @ini_set('memory_limit', DUP_PHP_MAX_MEMORY);
+        @ini_set('max_execution_time', DUP_PHP_EXECUTION_TIME);
+        //DUP_Util::setMemoryLimit(DUP_PHP_MAX_MEMORY);
+        //DUP_Util::setMaxExecutionTime(DUP_PHP_EXECUTION_TIME);
+
+        $package = null;
+        if ($package = $this->buildPackage()) {
+            if (DUP_Util::isWinOS()) {
+                $package = DUP_Util::safePath($package);
+            }
+            $packageName = basename($package);
+
+            if ($this->useLocalFolder) {
+                if (file_exists($package)) {
+                    DUP_Logs::log("Package <{$packageName}> saved locally.", 'message');
+                } else {
+                    DUP_Logs::log("An error occured.");
+                }
+            }
+
+
+            if ($this->useFTP) {
+                try {
+                    $ftp = new \FTPClient();
+                    $ftp->setHost($this->ftpHostname);
+                    $ftp->setPort(empty($this->ftpPort) ? 21 : $this->ftpPort);
+                    $ftp->setUser($this->ftpUsername);
+                    $ftp->setPassword($this->ftpPassword);
+                    $ftp->setTimeout(empty($this->ftpTimeout) ? 90 : $this->ftpTimeout);
+                    ($this->ftpSSL == true) ? $ftp->ssl_connect() : $ftp->connect();
+                    $ftp->login();
+                    $ftp->pasv($this->ftpPassive);
+                    $ftp->setPath($this->ftpDirectory);
+                    $ftp->upload(basename($package), $package, $this->ftpDirectory);
+                    $ftp->deleteOldBackups($this->maxPackages, $this->deadline);
+                    $ftp->disconnect();
+                    DUP_Logs::log("FTP: package <{$packageName}> uploaded successfuly.", 'message');
+                } catch (\FTPClientException $ex) {
+                    if (@is_resource($ftp)) $ftp->disconnect();
+                    DUP_Logs::log("FTP error: " . $ex->getMessage(), 'error');
+                }
+            }
+
+            if ($this->useGoogleDrive) {
+                try {
+                    if (!class_exists("Google_Client")) {
+                        throw new Exception("GoogleDrive requires that the GoogleDrive API PHP Client be added to your /composer.json file");
+                    }
+
+                    $google = new \GoogleDriveClient();
+                    $google->setTempFolder(DUP_TEMP_FOLDER);
+                    $google->setAppName(DUP_APPLICATION_NAME);
+                    $google->setGoogleKeyFile($this->googleKeyFile);
+                    $google->setShareWithEmail($this->shareWithEmail);
+                    $google->setMaxPackages($this->maxPackages);
+                    $google->connect();
+                    $google->upload($package);
+                    $files = $google->getPackages(DUP_PACKAGE_EXTENSION, DUP_PACKAGE_MIME_TYPE, $this->deadline);
+                    if(is_array($files) && count($files)) $google->deleteFile($files);
+                    //$quota = $google->getStorageQuota();
+                    //bd(DUP_Util::human_filesize($quota));
+                } catch (\Exception $ex) {
+                    DUP_Logs::log("GoogleDrive error: " . $ex->getMessage(), 'error');
+                }
+            }
+
+            if ($this->useDropbox) {
+                try {
+                    if (!class_exists("\\Dropbox\\Client")) {
+                        throw new \DropBoxClientException("Dropbox requires that the Dropbox API PHP Client be added to your /composer.json file");
+                    }
+
+                    $dropbox = new \DropboxClient();
+                    $dropbox->setAccessToken($this->dropboxAccessToken);
+                    $dropbox->setIdentifier("Duplicator/1.0.0");
+                    $dropbox->setFolder(DUP_APPLICATION_NAME);
+                    $dropbox->setQuery(DUP_PACKAGE_EXTENSION);
+                    $dropbox->setMimeType(DUP_PACKAGE_MIME_TYPE);
+                    $dropbox->setMaxPackages($this->maxPackages);
+                    if ($dropbox->upload($package)) {
+                        DUP_Logs::log("Dropbox: package <{$packageName}> uploaded successfully.");
+                    } else {
+                        throw new \DropBoxClientException("an error occured while uploading the package <{$packageName}>");
+                    }
+                    $dropbox->deleteOldBackups($this->maxPackages, $this->deadline);
+                } catch (\Exception $ex) {
+                    DUP_Logs::log("Dropbox error: " . $ex->getMessage(), 'error');
+                }
+            }
+
+            if ($this->useAmazonS3) {
+                try {
+                    if (!class_exists("\\Aws\\S3\\S3Client")) {
+                        throw new \AmazonS3ClientException("AmazonAPI requires that the Amazon API PHP Client be added to your /composer.json file");
+                    }
+
+                    $amazonaws = new \AmazonS3Client();
+                    $amazonaws->setAccessKey($this->awsAccessKey);
+                    $amazonaws->setSecretKey($this->awsSecretKey);
+                    $amazonaws->setRegion($this->awsRegion);
+                    $amazonaws->setBucket($this->awsBucketName);
+                    $buckets = $amazonaws->getBuckets();
+                    $bucketExist = false;
+                    foreach ($buckets as $bucket) {
+                        if (strcmp($bucket, $this->awsBucketName) === 0) {
+                            $bucketExist = true;
+                            break;
+                        }
+                    }
+                    if (!$bucketExist) $amazonaws->createBucket($this->awsBucketName);
+                    $amazonaws->upload($package, $packageName);
+                    //if($url === null) throw new AmazonS3ClientException("AmazonS3: An error occured while uploading package <{$packageName}>");
+                    $amazonaws->deleteOldBackups($this->maxPackages, $this->deadline);
+                } catch (\Aws\Exception\MultipartUploadException $ex) {
+                    DUP_Logs::log("AmazonS3 error: " . $ex->getMessage(), 'error');
+                } catch(AmazonS3ClientException $ex) {
+                    DUP_Logs::log("AmazonS3 error: " . $ex->getMessage(), 'warning');
+                } catch (\Exception $ex) {
+                    DUP_Logs::log("AmazonS3 error: " . $ex->getMessage(), 'error');
+                }
+            }
+
+            if (!empty($this->deadline) || $this->maxPackages <= DUP_Util::getTotalPackages(self::$_data->localPath, DUP_PACKAGE_EXTENSION) && DUP_Util::getTotalPackages(self::$_data->localPath, DUP_PACKAGE_EXTENSION) != 0) {
+                $removed = count(DUP_Util::clean(self::$_data->localPath, $this->maxPackages, strtotime("-{$this->deadline}")));
+                if ($removed > 0) DUP_Logs::log(sprintf("Deleted <%d> local package%s", $removed, ($removed > 1) ? 's' : ''));
+            }
+
+            if($this->removeBackups && !$this->useLocalFolder) {
+                DUP_Util::deleteFile($package);
+                DUP_Logs::log("Generated package <{$packageName}> removed from local folder.");
+            }
+        } else {
+            DUP_Logs::log("Package build failed.");
+            return null;
+        }
+        
+        return true;
+    }
+
+    protected static function getLocalFolderInfo()
+    {
+        $pkgs = DUP_Util::getTotalPackages(self::$_data->localPath, DUP_PACKAGE_EXTENSION);
+        $path = strlen(self::$_data->localPath) > 0 ? self::$_data->localPath : self::$_data->defaultLocalPath;
+        $infos['markupText'] = 'Invalid directory';
+        //$infos['notes'] = sprintf(__(" » %d package(s) found"), $pkgs);
+        if (!empty($path)) {
+            wire('modules')->get('JqueryUI')->use('modal');
+            //$href = wire('config')->urls->admin . "module/edit?name=" . DUP_APPLICATION_NAME . "&action=view_listing";
+            $href = wire('config')->urls->admin . "setup/". DUP_APPLICATION_NAME ."/?action=get_packages";
+            $preview = ($pkgs === 0) ? '' : "<a href='{$href}' class='pw-modal'><i class='fa fa-eye'></i> </a>";
+            $infos['markupText'] = sprintf("Local packages overview › <span class='notes'>%s</span><br>Disk space used › \t<span class='notes'>&nbsp;~%s&nbsp;</span><br>Disk space remaining › <span class='notes'>&nbsp;%s/%s&nbsp;</span><br>Package(s) found › <span class='notes'>&nbsp;%d&nbsp;</span> {$preview}",
+                self::$_data->localPath,
+                ($pkgs == 0) ? '0' : DUP_Util::formatBytes(DUP_Util::foldersize($path), 0),
+                DUP_Util::formatBytes(disk_free_space($path), 0),
+                DUP_Util::formatBytes(disk_total_space($path), 0),
+                DUP_Util::getTotalPackages(self::$_data->localPath, DUP_PACKAGE_EXTENSION)
+            );
+        }
+        return $infos;
+    }
+
+    public static function getModuleConfigInputfields(array $data)
+    {
+        $data = array_merge(self::getDefaultData(), $data);
+
+        $config = wire('config');
+        $input = wire('input');
+        $modules = wire('modules');
+
+        $fields = new InputfieldWrapper();
+
+        // Local info
+        $field = $modules->get("InputfieldMarkup");
+        $markup = self::getLocalFolderInfo();
+        $field->markupText = $markup['markupText'];
+        //$field->notes = $markup['notes'];
+        $field->showIf = "useLocalFolder=1";
+        $fields->add($field);
+
+        $fsa = $modules->get("InputfieldFieldset");
+        $fsa->label = __("Actions");
+        $fsa->icon = 'bolt';
+        //$fsa->collapsed = Inputfield::collapsedHidden;
+
+        $href = $config->urls->admin . 'module/edit?name=' . self::$_data->className . '&collapse_info=1&action=backup_now';
+        //$href = $config->urls->admin . 'module/edit?name=Duplicator&collapse_info=1&action=backup_now';
+        $field = $modules->get('InputfieldButton');
+        $field->attr('id+name', 'backupNow');
+        $field->attr('value', 'Backup now');
+        $field->attr('data-action', $href);
+        $field->icon = 'clone';
+        $fsa->append($field);
+
+        if(DUP_Util::getTotalPackages(self::$_data['localPath'], DUP_PACKAGE_EXTENSION)) {
+            $href = $config->urls->admin . 'module/edit?name=' . self::$_data->className . '&collapse_info=1&action=clean_packages';
+            //$href = $config->urls->admin . 'module/edit?name=Duplicator&collapse_info=1&action=backup_now';
+            $field = $modules->get('InputfieldButton');
+            $field->attr('id+name', 'pruneBackups');
+            $field->attr('value', 'Clean packages');
+            $field->attr('data-action', $href);
+            $field->attr('enabled', 'disabled');
+            $field->icon = 'trash';
+            $fsa->append($field);
+        }
+
+        /*$field = $modules->get("InputfieldMarkup");
+        $href = "<a href='" . $config->urls->admin . "module/edit?name=Duplicator&collapse_info=1&action=backup_now'> Backup Now</a>";
+        $field->markupText = $href;
+        $fsa->append($field);*/
+
+        $fields->append($fsa);
+
+
+        $fs = $modules->get("InputfieldFieldset");
+        $fs->label = __("Package settings");
+        $fs->icon = 'cogs';
+        $fs->description = __("Override module's settings.");
+        $fs->collapsed = false;
+
+        $field = $modules->get("InputfieldText");
+        $field->attr('name', 'packageName');
+        $field->label = __("Name");
+        $field->icon = 'file';
+        $field->description = __("Name of the final package file - without extension.");
+        if ($data['packageName']) $field->attr('value', $data['packageName']);
+        $field->collapsed = false;
+        $field->notes = 'Default name: {timestamp}-' . $config->httpHost . '.' . DUP_PACKAGE_EXTENSION;
+        $fs->append($field);
+
+        $field = $modules->get("InputfieldFieldset");
+        $field->label = "Files and folders excluded from...";
+        $field->description = "Files and folders excluded from the package.";
+        $field->icon = 'times-circle';
+        //$field->notes = __("");
+        $field->collapsed = false;
+
+        $fim = $modules->get("InputfieldMarkup");
+        $fim->attr('class', 'warning-notes');
+        $fim->markupText = '<p><strong><i class="fa fa-warning"></i> Are you sure you want to include the &laquo;Backups&raquo; folder ?</strong></p>';
+        $fim->notes = __('Including this folder will make the final package file growing exponentially.');
+        $fim->showIf = "backups=0";
+        $field->append($fim);
+
+        $checkboxes = [
+            ['name' => 'backupWire', 'label' => 'Wire', 'checked' => (isset($data['backupWire']) && $data['backupWire']) == '1' ? '1' : '0'],
+            ['name' => 'backups', 'label' => 'Backups', 'checked' => (isset($data['backups']) && $data['backups']) == '1' ? '1' : '0'],
+            ['name' => 'backupLogs', 'label' => 'Logs', 'checked' => (isset($data['backupLogs']) && $data['backupLogs']) == '1' ? '1' : '0'],
+            ['name' => 'backupSessions', 'label' => 'Sessions', 'checked' => (isset($data['backupSessions']) && $data['backupSessions']) == '1' ? '1' : '0'],
+            ['name' => 'backupCache', 'label' => 'Cache', 'checked' => (isset($data['backupCache']) && $data['backupCache']) == '1' ? '1' : '0'],
+            ['name' => 'backupFiles', 'label' => 'Files', 'checked' => (isset($data['backupFiles']) && $data['backupFiles']) == '1' ? '1' : '0']
+        ];
+        foreach ($checkboxes as $checkbox) {
+            $cb = $modules->get('InputfieldCheckbox');
+            $cb->attr('name', $checkbox['name']);
+            $cb->label = $checkbox['label'];
+            $cb->columnWidth = 16;
+            $cb->attr('checked', $checkbox['checked'] == '1' ? 'checked' : '');
+            $field->append($cb);
+        }
+
+        $fim = $modules->get("InputfieldMarkup");
+        $fim->attr('class', 'pw-notes');
+        $fim->markupText = '<p class="notes">Shortcuts: Wire refer to the root <span><strong>&laquo;wire/&raquo;</strong></span> folder. Backups, Logs, Sessions, Cache and Files refer to <span><strong>&laquo;site/assets/&raquo;</strong></span></p>';
+        $field->append($fim);
+
+        $ta = $modules->get("InputfieldTextarea");
+        $ta->attr('name', 'ignoredPath');
+        $ta->label = "Custom excluded files and paths";
+        $ta->value = $data['ignoredPath'];
+        $ta->collapsed = false;
+        $ta->notes = 'Enter absolute or relative path. One (1) extension, filename or path per line. To exclude extension: *.foo';
+        $ta->columnWidth = 50;
+        $field->append($ta);
+
+        $f = $modules->get('InputfieldAsmSelect');
+        $f->name = 'ignoredExtensions';
+        $f->label = __('Filetype exclusions', __FILE__);
+        $f->description = __('Default set of extensions to exclude.', __FILE__);
+        $f->collapsed = Inputfield::collapsedNever;
+        $f->columnWidth = 50;
+        $f->addOption('*.pdf', 'PDF');
+        $f->addOption('*.mp3', 'MP3');
+        $f->addOption('*.jpg', 'JPG');
+        $f->addOption('*.png', 'PNG');
+        $f->addOption('*.zip', 'ZIP');
+        $f->addOption('*.tar', 'TAR');
+        $f->addOption('*.gz', 'TAR GUNZIP');
+        $f->addOption('*.tgz', 'TGZ');
+        $f->addOption('*.rar', 'RAR');
+
+        if (isset($data[ $f->name ]) && $data[ $f->name ]) {
+            $f->attr('value', $data[ $f->name ]);
+        }
+        $field->append($f);
+
+        $fs->append($field);
+
+        /*$field = $modules->get("InputfieldSelect");
+        $field->attr('name', 'cycle');
+        $field->label = __("Event trigger");
+        $field->icon = 'refresh';
+        $field->description = __("Select a time interval for automated package backups.");
+        if ($data['cycle'] == 'logoutTrigger') $field->notes = __("The cronjob to backup your database executes only if current user has db-backup permission.");
+        $field->addOptions(array(
+            0 => __('never'),
+            'every30Seconds' => __('30 seconds'), // dev use
+            'everyHour' => __('1 hour'),
+            'every6Hours' => __('6 hours'),
+            'everyDay' => __('1 day'),
+            'every2Days' => __('2 days'),
+            'everyWeek' => __('1 week'),
+            'every2Weeks' => __('2 weeks'),
+            'every4Weeks' => __('4 weeks'),
+            'logoutTrigger' => __('logout trigger'),
+            'submitTrigger' => __('OnSubmit (module save) trigger') // dev use
+        ));
+        if ($input->post->cycle && $input->post->cycle != $data['cycle']) $field->message(__('Backup cycle interval changed to') . ' ' . $input->post->cycle);
+        $field->value = $data['cycle'];
+        $field->collapsed = false;
+        $fs->add($field);*/
+
+        $field = $modules->get('InputfieldInteger');
+        $field->attr('name', 'maxPackages');
+        $field->value = $data['maxPackages'];
+        $field->icon = 'signal';
+        $field->attr('min', 1);
+        $field->attr('max', DUP_MAX_PACKAGES);
+        $field->attr('type', 'number');
+        $field->set('collapsed', true);
+        $field->label = __('Maximum number of packages');
+        $field->description = __('How many packages do you want to keep in the storage directory ?');
+        $field->notes = sprintf(__("max value: %d"), DUP_MAX_PACKAGES);
+        $field->columnWidth = 50;
+        $field->collapsed = false;
+        $fs->add($field);
+
+        $cb = $modules->get('InputfieldCheckbox');
+        $cb->attr('name', 'removeBackups');
+        $cb->icon = 'trash';
+        $cb->label = 'Remove package after build';
+        $cb->description = 'If checked, the package will be removed after a successful build and only if &laquo;Local Folder&raquo; storage is unchecked.';
+        $cb->columnWidth = 50;
+        $cb->attr('checked', $data['removeBackups'] == '1' ? 'checked' : '');
+        $fs->append($cb);
+
+        $fields->append($fs);
+
+        /*$field = $modules->get('InputfieldCheckbox');
+        $field->attr('name', 'useEncryption');
+        $field->label = 'Use encryption ?';
+        $field->attr('checked', $data['useEncryption'] == '1' ? 'checked' : '' );
+        $fs->append($field);
+
+        $field = $modules->get("InputfieldText");
+        $field->attr('name', 'encryptionKey');
+        $field->label = __("Encryption key");
+        $field->icon = 'lock';
+        $field->description = __("");
+        if($data['encryptionKey']) $field->attr('value', $data['encryptionKey']);
+        $field->collapsed = false;
+        $field->showIf = "useEncryption=1";
+        $fs->append($field);*/
+
+        $fs = $modules->get("InputfieldFieldset");
+        $fs->label = __("Cron and timing settings");
+        $fs->icon = 'clock-o';
+        $fs->collapsed = false;
+
+        $field = $modules->get("InputfieldRadios");
+        $field->label = __("Select a mode for running cron jobs");
+        $field->allowMarkup = true;
+        $field->attr('id+name', 'cronMode');
+        $mod = $modules->isInstalled('LazyCron') ? '(installed)' : '(available)';
+        $field->addOption('LazyCron', __("LazyCron - Triggered by a pageview {$mod}"));
+        $mod = $modules->isInstalled('PwCron') ? " (installed)" : ' (available)';
+        $field->addOption('PWCron', __("PWCron - Cron or equivalent system required {$mod}"));
+        $field->addOption('none', 'None');
+        $field->attr('value', is_null($data['cronMode']) ? 'none' : $data['cronMode']);
+        $fs->append($field);
+
+        $field = $modules->get("InputfieldSelect");
+        $field->attr('name', 'cycle');
+        $field->attr('class', 'invisble');
+        $field->label = __("Event trigger");
+        $field->icon = 'refresh';
+        $field->description = __("Select a time interval for automated LazyCron backups.");
+        if ($data['cycle'] == 'logoutTrigger') $field->notes = __("The cronjob to backup your database executes only if current user has db-backup permission.");
+        $field->addOptions(array(
+            0 => __('Trigger disabled'),
+            'every30Seconds' => __('30 seconds [dev]'), // dev use
+            'every2Minutes' => '2 minutes [dev]',
+            'every5Minutes' => '5 minutes [dev]',
+            'every10Minutes' => '10 minutes [dev]',
+            'submitTrigger' => __('OnSubmit  [dev]'), // dev use
+            'everyHour' => __('1 hour'),
+            'every6Hours' => __('6 hours'),
+            'everyDay' => __('1 day'),
+            'every2Days' => __('2 days'),
+            'everyWeek' => __('1 week'),
+            'every2Weeks' => __('2 weeks'),
+            'every4Weeks' => __('4 weeks'),
+            'logoutTrigger' => __('logout trigger')
+        ));
+        if ($input->post->cycle && $input->post->cycle != $data['cycle']) $field->message(__('Backup cycle interval changed to') . ' ' . $input->post->cycle);
+        $field->value = $data['cycle'];
+        $field->notes = "This setting does not apply to PWCron.";
+        $fs->add($field);
+
+        $field = $modules->get("InputfieldSelect");
+        $field->attr('name', 'deadline');
+        $field->label = __('Remove backup packages older than');
+        $field->icon = 'calendar';
+        $field->description = __("Select a time interval after a backup will be deleted sustainably by the cron job.");
+        $field->set('collapsed', true);
+        $field->addOptions(array(
+            null => __('never'),
+            '1 minute' => __('1 minute'), // for development use
+            '1 day' => __('1 day'),
+            '1 week' => __('1 week'),
+            '1 month' => __('1 month'),
+            '1 year' => __('1 year'),
+        ));
+        $field->value = $data['deadline'];
+        $field->collapsed = false;
+        $fs->add($field);
+
+        $fields->append($fs);
+
+
+        $fs = $modules->get("InputfieldFieldset");
+        $fs->label = "Save package to";
+        $fs->icon = 'cloud';
+        $fs->collapsed = false;
+
+        // LOCAL
+        $field = $modules->get('InputfieldCheckbox');
+        $field->attr('name', 'useLocalFolder');
+        $field->label = 'Local folder';
+        $field->attr('checked', $data['useLocalFolder'] == '1' ? 'checked' : '');
+        $fs->append($field);
+
+        $fslocalfolder = $modules->get("InputfieldFieldset");
+        $fslocalfolder->label = "Local folder settings";
+        $fslocalfolder->description = "Save packages to a local folder.";
+        $fslocalfolder->icon = 'folder-open';
+        $fslocalfolder->collasped = true;
+        $fslocalfolder->showIf = "useLocalFolder=1";
+
+        $field = $modules->get("InputfieldText");
+        $field->attr('name', 'localPath');
+        $field->label = __("Path");
+        $field->description = __('Absolute path of the directory where packages are saved.');
+        $field->value = $data['localPath'];
+        $field->notes = 'Default path: ' . self::$_data->defaultLocalPath;
+        $fslocalfolder->append($field);
+
+        $fs->append($fslocalfolder);
+
+        // FTP
+        $field = $modules->get('InputfieldCheckbox');
+        $field->attr('name', 'useFTP');
+        $field->label = 'FTP';
+        $field->attr('checked', $data['useFTP'] == '1' ? 'checked' : '');
+        $fs->append($field);
+
+        $fsftp = $modules->get("InputfieldFieldset");
+        $fsftp->label = "FTP Settings";
+        $fsftp->description = "Save packages to FTP server.";
+        $fsftp->icon = 'exchange';
+        $fsftp->collasped = true;
+        $fsftp->showIf = "useFTP=1";
+
+        $field = $modules->get("InputfieldText");
+        $field->attr('name', 'ftpHostname');
+        $field->label = __("Hostname");
+        $field->value = $data['ftpHostname'];
+        $field->columnWidth = 50;
+        $fsftp->append($field);
+
+        $field = $modules->get("InputfieldText");
+        $field->attr('name', 'ftpUsername');
+        $field->label = __("Username");
+        $field->value = $data['ftpUsername'];
+        $field->columnWidth = 25;
+        $fsftp->append($field);
+
+        $field = $modules->get("InputfieldText");
+        $field->attr('name', 'ftpPassword');
+        $field->label = __("Password");
+        $field->value = $data['ftpPassword'];
+        $field->columnWidth = 25;
+        $fsftp->append($field);
+
+        $field = $modules->get('InputfieldText');
+        $field->attr('name', 'ftpPort');
+        $field->label = __("Port");
+        $field->description = __("Default: 21");
+        $field->value = $data['ftpPort'];
+        $field->columnWidth = 25;
+        $fsftp->append($field);
+
+        $field = $modules->get('InputfieldText');
+        $field->attr('name', 'ftpTimeout');
+        $field->label = __("Timeout");
+        $field->description = __("Default: 90 seconds");
+        $field->value = $data['ftpTimeout'];
+        $field->columnWidth = 25;
+        $fsftp->append($field);
+
+        $field = $modules->get('InputfieldCheckbox');
+        $field->attr('name', 'ftpSSL');
+        $field->label = __("Use SSL/TLS");
+        $field->description = __("Cryptographic protocols");
+        $field->attr('checked', $data['ftpSSL'] == '1' ? 'checked' : '');
+        $field->columnWidth = 25;
+        $fsftp->append($field);
+
+        $field = $modules->get('InputfieldCheckbox');
+        $field->attr('name', 'ftpPassive');
+        $field->label = __("Passive Mode");
+        $field->description = __("Passive connection");
+        $field->attr('checked', $data['ftpPassive'] == '1' ? 'checked' : '');
+        $field->columnWidth = 25;
+        $fsftp->append($field);
+
+        $field = $modules->get("InputfieldText");
+        $field->attr('name', 'ftpDirectory');
+        $field->label = __("Upload directory");
+        $field->description = __("Directory on the server where the packages will be stored.");
+        $field->value = $data['ftpDirectory'];
+        $field->notes = __("Example: backups/subdir/anothersubdir");
+        $field->columnWidth = 100;
+        $fsftp->append($field);
+
+        $fs->append($fsftp);
+
+        // GOOGLE DRIVE
+        $field = $modules->get('InputfieldCheckbox');
+        $field->attr('name', 'useGoogleDrive');
+        $field->label = 'Google Drive';
+        $field->attr('checked', $data['useGoogleDrive'] == '1' ? 'checked' : '');
+        $fs->append($field);
+
+        $fsgd = $modules->get("InputfieldFieldset");
+        $fsgd->label = "Google Drive settings";
+        $fsgd->description = "Save packages to GoogleDrive.";
+        $fsgd->icon = 'google';
+        $fsgd->showIf = "useGoogleDrive=1";
+
+        $field = $modules->get("InputfieldText");
+        $field->attr('name', 'googleDriveClientId');
+        $field->label = __("Client ID");
+        $field->value = $data['googleDriveClientId'];
+        $fsgd->append($field);
+
+        $field = $modules->get('InputfieldTextarea');
+        $field->name = "googleKeyFile";
+        $field->label = __("Key File");
+        $field->description = __("Paste here the content of the JSON Key file of your service account.");
+        $field->value = $data['googleKeyFile'];
+        $fsgd->append($field);
+
+        $field = $modules->get('InputfieldText');
+        $field->attr('name', 'shareWithEmail');
+        $field->label = __("Email address");
+        $field->description = __("Enter the email address of the contact with whom you want to share the files.");
+        $field->value = $data['shareWithEmail'];
+        $fsgd->append($field);
+        $fs->append($fsgd);
+
+        // DROPBOX
+        $field = $modules->get('InputfieldCheckbox');
+        $field->attr('name', 'useDropbox');
+        $field->label = 'Dropbox';
+        $field->attr('checked', $data['useDropbox'] == '1' ? 'checked' : '');
+        $fs->append($field);
+
+        $fsdb = $modules->get("InputfieldFieldset");
+        $fsdb->label = "Dropbox settings";
+        $fsdb->description = "Save packages to Dropbox.";
+        $fsdb->icon = 'dropbox';
+        $fsdb->showIf = "useDropbox=1";
+
+        $field = $modules->get('InputfieldText');
+        $field->attr('name', 'dropboxAccessToken');
+        $field->label = __("Generated access token");
+        $field->value = $data['dropboxAccessToken'];
+        $field->notes = "Obtain an Access Token there: https://www.dropbox.com/developers/apps";
+        $fsdb->append($field);
+        $fs->append($fsdb);
+
+        // AMAZON
+        $field = $modules->get('InputfieldCheckbox');
+        $field->attr('name', 'useAmazonS3');
+        $field->label = 'Amazon S3';
+        $field->attr('checked', $data['useAmazonS3'] == '1' ? 'checked' : '');
+        $fs->append($field);
+
+        $fsaws = $modules->get("InputfieldFieldset");
+        $fsaws->label = "Amazon settings";
+        $fsaws->description = "Save packages to AmazonS3.";
+        $fsaws->icon = 'amazon';
+        $fsaws->showIf = "useAmazonS3=1";
+
+        $field = $modules->get('InputfieldText');
+        $field->attr('name', 'awsAccessKey');
+        $field->label = __("Access Key ID");
+        $field->value = $data['awsAccessKey'];
+        $field->columnWidth = 50;
+        $fsaws->append($field);
+
+        $field = $modules->get('InputfieldText');
+        $field->attr('name', 'awsSecretKey');
+        $field->label = __("Secret Key");
+        $field->value = $data['awsSecretKey'];
+        $field->columnWidth = 50;
+        $fsaws->append($field);
+
+        $field = $modules->get('InputfieldText');
+        $field->attr('name', 'awsBucketName');
+        $field->label = __("Bucket Name");
+        $field->description = __("The bucket where the packages will be stored.");
+        $field->notes = __("The bucket will be created automatically if not found.");
+        $field->value = $data['awsBucketName'];
+        $field->columnWidth = 70;
+        $fsaws->append($field);
+
+        // http://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
+        $field = $modules->get("InputfieldSelect");
+        $field->attr('name', 'awsRegion');
+        $field->label = __("Region");
+        $field->description = __("Select a region");
+        $field->notes = __("Last update: 2017-02-01");
+        $field->addOptions(array(
+            'us-east-1' => 'US East (N. Virginia)',
+            'us-east-2' => 'US East (Ohio)',
+            'us-west-1' => 'US West (N. California)',
+            'us-west-2' => 'US West (Oregon)',
+            'ca-central-1' => 'Canada (Central)',
+            'ap-south-1' => 'Asia Pacific (Mumbai)',
+            'ap-northeast-2' => 'Asia Pacific (Seoul)',
+            'ap-southeast-1' => 'Asia Pacific (Singapore)',
+            'ap-southeast-2' => 'Asia Pacific (Sydney)',
+            'ap-northeast-1' => 'Asia Pacific (Tokyo)',
+            'eu-central-1' => 'EU (Frankfurt)',
+            'eu-west-1' => 'EU (Ireland)',
+            'eu-west-2' => 'EU (London)',
+            'sa-east-1' => 'South America (São Paulo)'
+        ));
+        $field->value = $data['awsRegion'];
+        $field->columnWidth = 30;
+        $fsaws->add($field);
+
+        $fs->append($fsaws);
+
+        $fields->append($fs);
+
+        return $fields;
+    }
+}

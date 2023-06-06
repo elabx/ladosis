@@ -1,0 +1,346 @@
+<?php namespace ProcessWire;
+
+/**
+* Media Manager: Fieldtype
+*
+* Fieldtype that stores Media Manager media attached to a page.
+* References to 4 media types are stored: audio, file, image and video).
+*
+* @author Francis Otieno (Kongondo) <kongondo@gmail.com> kongondo.com
+*
+* This is a Copyrighted Commercial Module. Please do not distribute or host publicly. The license is not transferable.
+*
+* FieldtypeMediaManager for ProcessWire
+* Copyright (C) 2015 by Francis Otieno
+* Licensed under a Commercial Licence (see README.txt)
+*
+*/
+
+class FieldtypeMediaManager extends FieldtypeMulti {
+
+	public static function getModuleInfo() {
+		return array(
+			'title' => 'Media Manager (Fieldtype)',
+			'author' => 'Francis Otieno (Kongondo)',
+			'version' => 9,
+			'href' => 'http://mediamanager.kongondo.com',
+			'summary' => 'Media Manager: Field that stores references to 4 types of media (audio, file, image, video) for use in Media Manager.',
+			'installs' => 'InputfieldMediaManager',
+			'requires' => 'ProcessMediaManager',
+			);
+	}
+
+	// the name of the instance (field) of this fieldtype
+	public static $name;
+
+
+	/**
+	 * Initialize this Fieldtype
+	 *
+	 */
+	public function init() {
+
+		parent::init();
+		$dir = dirname(__FILE__);
+		require_once("$dir/MediaManager.php");
+		require_once("$dir/MediaManagerArray.php");
+
+	}
+
+	/**
+	 * Return the required Inputfield used to populate a field of this type
+	 * These are properties that we want to be accessible to InputfieldMediaManager
+	 */
+	public function getInputfield(Page $page, Field $field) {
+
+		$inputfield = $this->wire('modules')->get("InputfieldMediaManager");
+
+		// our inputfield requires a Page and Field
+		$inputfield->setPage($page);// this is a method in InputfieldMediaManager
+		$inputfield->setField($field);// - ditto -
+
+
+		// @see Input Tab
+		$inputfield->set('modalLinkLabel', $field->modalLinkLabel);//default import mode (append vs. overwrite)
+
+		// @see Details Tab
+		$inputfield->set('allowedMedia', $field->allowedMedia);// array
+		$inputfield->set('maxFiles', $field->maxFiles);// if in use, below media-specific limits are ignored
+
+		return $inputfield;
+
+	}
+
+	/**
+	 * Return a blank ready-to-populate version of a field of this type
+	 *
+	 */
+	public function getBlankValue(Page $page, Field $field) {
+
+		$mm = new MediaManagerArray($page);
+		$mm->setTrackChanges(true);
+
+		self::$name = $field->name;
+
+		return $mm;
+
+	}
+
+	/**
+	 * set the config option fields for this Field
+	 * These appear in the 'Details' Tab when editing an instance of this Field
+	 */
+	public function ___getConfigInputfields(Field $field) {
+
+		$inputfields = parent::___getConfigInputfields($field);
+
+		$modules = $this->wire('modules');
+
+		$f = $modules->get('InputfieldCheckboxes');
+		$f->attr('name', 'allowedMedia');
+		$f->label = $this->_('Allowed Media Types');
+		$f->description = $this->_('Check the box next to each media type that you would like this MediaManager field to store.');
+		$f->notes = $this->_('If no option is checked, all four media types (audio, document, image, video) will be allowed.');
+		$f->addOption(1, 'Audio');
+		$f->addOption(2, 'Document');
+		$f->addOption(3, 'Image');
+		$f->addOption(4, 'Video');
+		$f->attr('value', $field->allowedMedia);
+
+		$inputfields->add($f);
+
+
+		// max files: overall (supersedes above four if zet to value > 0)
+		$f = $modules->get('InputfieldInteger');
+		$f->attr('name', 'maxFiles');
+		$f->attr('value', (int) $field->maxFiles);
+		$f->attr('size', 4);
+		$f->label = $this->_('Maximum media allowed');
+		$f->description = $this->_('0=No limit');
+		$f->collapsed = Inputfield::collapsedBlank;
+		$inputfields->append($f);
+
+		// insertAndClose: whether after inserting media in InputfieldMediaManager from the Media Library, to immediately close the magnificPopup dialog
+		$f = $modules->get("InputfieldCheckbox");
+		$f->attr('name', 'insertAndClose');
+		$f->attr('value', 1);
+		$f->attr('checked', $field->insertAndClose ? 'checked' : '');
+		$f->label = $this->_('Insert Media and Close Dialog');
+		$f->label2 = $this->_('Insert and Close');
+		#$f->collapsed = 1;// always collapsed
+		$f->notes = $this->_('If checked, will immediately close dialog/popup after media is added to InputfieldMediaManager.');
+
+		$inputfields->append($f);
+
+		return $inputfields;
+
+	}
+
+	/**
+     * Given a raw value (value as stored in DB), return the value as it would appear in a Page object
+ 	 *
+     * @param Page $page
+     * @param Field $field
+     * @param string|int|array $value
+     * @return string|int|array|object $value
+     *
+     */
+	public function ___wakeupValue(Page $page, Field $field, $value) {
+
+		// if for some reason we already get a valid value, then just return it
+		if($value instanceof MediaManagerArray) return $value;
+
+		// start a blank value to be populated (MediaManagerArray)
+		$mm = $this->getBlankValue($page, $field);
+
+		// if we were given a blank value, then we've got nothing to do: just return a blank MediaManagerArray
+		if(empty($value) || !is_array($value)) return $mm;
+
+		// create new MediaManager objects from each item in the array
+		foreach($value as $v) {
+
+			$m = new MediaManager();
+
+			$version = '';
+
+			// the id of the page with the media (not the one where the media is inserted/referenced!)
+			$m->id = (int) $v['data'];// @note we are converting 'data' to 'media-manager->id'
+			$m->type = (int) $v['type'];
+
+			// audio
+			if($m->type == 1) {
+				$mediaField = 'media_manager_audio';
+				$m->typeLabel = 'audio';
+			}
+			// document
+			elseif($m->type == 2) {
+				$mediaField = 'media_manager_document';
+				$m->typeLabel = 'document';
+			}
+			// image (original)
+			elseif($m->type == 3) {
+				$mediaField = 'media_manager_image';
+				$m->typeLabel = 'image';
+			}
+			// video
+			elseif($m->type == 4) {
+				$mediaField = 'media_manager_video';
+				$m->typeLabel = 'video';
+			}
+			// image (variation of an original)
+			elseif(strlen($m->type) > 1 && (int)substr($m->type, 0, 1) === 3) {
+				$mediaField = 'media_manager_image';
+				$version = (int) substr($m->type, 1);
+				$m->typeLabel = 'image';
+			}
+
+			$mediaPage = $this->wire('pages')->get($m->id);
+			if(!$mediaPage) continue;// if we didn't find the page, continue (maybe it was deleted)
+
+			// skip unpublished pages @todo: OR ONLY IN FRONTEND? MAYBE CONFIGURABLE?
+			if($mediaPage->is(Page::statusUnpublished)) continue;
+
+			if($mediaPage->$mediaField == '') continue;// if no media on page, continue
+
+			// we want the media itself, not its page, to add it to our MediaManagerArray
+			// @note, we add the specific media object itself, not the image field!
+
+			// if we got a $version, we are dealing with a variation of an original image (e.g. cropped version)
+			if($version) {
+				$m->media = $m->getImageVersion($mediaPage, $version);// lets get the version @note: object
+			}
+			// else if dealing with an original image (we know it is a multiple image field with the original as the first image)
+			elseif($m->type == 3) $m->media = $mediaPage->$mediaField->first();// @note: object
+			// else we are dealing with a single media field
+			else $m->media = $mediaPage->$mediaField;
+
+			if(!$m->media) continue;// if media has been deleted, skip it
+
+			$m->title = $mediaPage->title;
+
+			$m->setTrackChanges(true);//track changes for individual media-manager
+			$mm->add($m);// add to mm
+
+		}//end foreach $value as $v
+
+		$mm->resetTrackChanges();// reset track changes for all mm
+
+		return $mm;
+
+	}
+
+	/**
+     * Given an 'awake' value, as set by wakeupValue, convert the value back to a basic type for storage in DB.
+     *
+     * @param Page $page
+     * @param Field $field
+     * @param string|int|array|object $value
+     * @return string|int
+     *
+     */
+	public function ___sleepValue(Page $page, Field $field, $value) {
+
+		$sleepValue = array();
+
+		// if we are given something other than an MediaManagerArray,
+		// then just return a blank array
+		if(!$value instanceof MediaManagerArray) return $sleepValue;
+
+		// sort
+		$value->sort('sort');
+
+		// convert each MediaManager to an array within sleepValue
+		foreach($value as $m) {
+
+				$sleepValue[] = array(
+					'data' => (int) $m->id, // @note: media-manager->id is becoming data which is a required column in a Fieldtype
+					'type' => (int) $m->type,
+				);
+
+		}// end foreach $value as $m
+
+		return $sleepValue;
+
+	}
+
+	/**
+	 * Given a value, make it clean for storage within a Page
+	 *
+	 */
+	public function sanitizeValue(Page $page, Field $field, $value) {
+
+		// if given a blank value, return a valid blank value
+		if(empty($value)) return $this->getBlankValue($page, $field, $value);
+
+		// if given something other than an MediaManagerArray, throw an error
+		if(!$value instanceof MediaManagerArray) throw new WireException("Value set to field '$field->name' must be an MediaManagerArray");
+
+		// @note that sanitization of individual fields within a given media-manager is already...
+		// ...performed by the MediaManager::set() method, so we don't need to do anything else here
+
+		return $value;
+
+	}
+
+	/**
+	 * Format a value for output, called when a Page's outputFormatting is on
+	 *
+	 */
+	public function formatValue(Page $page, Field $field, $value) {
+
+		// we actually don't need to do anything in here since each MediaManager object
+		// is doing this work in the MediaManager::get() method. But I've included this
+		// comment here just to explain where that is taking place.
+
+		#the idea here is to transform, where necessary, a db value for display in the input field or on a rendered page
+
+		return $value;
+
+	}
+
+	/**
+	 * Return the database schema that defines a MediaManager item
+	 *
+	 */
+	public function getDatabaseSchema(Field $field) {
+
+		$schema = parent::getDatabaseSchema($field);
+
+		//'data' is a required field for any Fieldtype, and we're using it to represent our 'media-manager->row' field (column in db)
+		$schema['data'] = 'INT NOT NULL DEFAULT 0';//we reuse this required field/column for pageID of page with the media
+		$schema['type'] = 'TINYINT UNSIGNED NOT NULL';// 1=audio; 2=document; 3=image; 4=video; 3xxx=image-variation
+
+		//indexes, for any fields that need to be searchable from selectors
+		//make all our fields searchable
+		$schema['keys']['data'] = 'KEY data(data)';// searchable data(id) = page->id of media->id
+		$schema['keys']['type'] = 'KEY type(type)';//searchable type = $media->type
+
+		return $schema;
+	}
+
+	/**
+	 * Method called when the field is database-queried from a selector
+	 *
+	 */
+	public function getMatchQuery($query, $table, $subfield, $operator, $value) {
+
+
+		// If searching 'media' then assume our default (data) field
+		if($subfield == 'media') {
+			$subfield = 'data';
+			//if we got a media=selection string, we assume it is a title
+			if(!ctype_digit("$value") && strlen($value)) {
+				//first get the page by name, then grab their ID
+				$r = wire('pages')->get('name=' . $this->wire('sanitizer')->pageName($value));
+				if($r and $r->id > 0) $value = $r->id;
+			}
+
+		}
+
+		return parent::getMatchQuery($query, $table, $subfield, $operator, $value);
+
+	}
+
+
+}
+

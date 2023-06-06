@@ -1,0 +1,8 @@
+.ui-state-hover a, .ui-state-hover a:hover, .ui-state-hover a:link, .ui-state-hover a:visited {
+	text-decoration: underline;
+}
+
+.InputfieldPageEditButton, .InputfieldPageNewButton {
+	display: inline-block;
+	margin: 4px;
+}

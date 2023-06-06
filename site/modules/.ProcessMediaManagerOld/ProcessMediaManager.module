@@ -1,0 +1,1077 @@
+<?php namespace ProcessWire;
+
+/**
+* Media Manager: Process
+*
+* Ajax driven full media manager for audio, document, image and video files.
+* Enables the creation of a digital media library. Features include
+*	- Lightning-fast searches of your media library
+*	- Preview of audio, image and video medial
+*	- Create variations of images
+*	- Media tagging and descriptions
+*	- Beautiful easy to use interface
+*
+* @author Francis Otieno (Kongondo)
+*
+* This is a Copyrighted Commercial Module. Please do not distribute or host publicly. The license is not transferable.
+*
+* ProcessMediaManager for ProcessWire
+* Copyright (C) 2015 by Francis Otieno
+* Licensed under a Commercial Licence (see README.txt)
+*
+* @permission Permission 'media-manager':			This permission allows the user to access/view Media Manager.
+*													The permission is automatically created when the module is installed.
+* @permission Permission 'media-manager-settings':	This permission allows the user to edit media manager upload settings.
+*													The permission is automatically created when the module is installed.
+*
+* -----------------------------------------------------------------------------------------------------------------------------------
+* Custom Permissions. @note: These permissions kick in only if present. Create them and assign them to roles if you need to use them.
+* -----------------------------------------------------------------------------------------------------------------------------------
+*
+* @permission Permission 'media-manager-upload':	This permission allows the user to upload media to the media library.
+* @permission Permission 'media-manager-publish': 	This permission allows the user to (un)publish media in the media library.
+* @permission Permission 'media-manager-lock': 		This permission allows the user to (un)lock media in the media library.
+* @permission Permission 'media-manager-delete': 	This permission allows the user to trash or delete media in the media library.
+*													It does not apply to media in 'draft/review/temporary' folder.
+* @permission Permission 'media-manager-edit': 		This permission allows the user to edit media (cropping, resizing, renaming, enter descriptions and tags, etc.) in the media library.
+*
+*
+*/
+
+class ProcessMediaManager extends ProcessPageLister implements Module {
+
+	/**
+	 * Return information about this module (required).
+	 *
+	 * @access public
+	 * @return array of information.
+	 *
+	 */
+	public static function getModuleInfo() {
+
+		return array(
+			'title' => 'Media Manager (Process)',
+			'author' => 'Francis Otieno (Kongondo)',
+			'version' => 9,
+			'href' => 'http://mediamanager.kongondo.com',
+			'summary' => 'A rich visual ajax-driven Media Manager for Audio, File, Image and Video types.',
+			'singular' => true,
+			'autoload' => false,
+			'permission' => 'media-manager',
+			'installs' => array('FieldtypeMediaManager', 'MediaManagerImageEditor'),
+			'requires' => 'JqueryFileUpload',
+		);
+
+	}
+
+	const PAGE_NAME = 'media-manager';// this process' name
+
+	protected $mediaTypeStr;// audio|document|image|video
+	protected $mediaUploadsDir;
+	protected $mediaUploadsURL;
+	protected $extraCSSClass; // theme specific CSS Classes (e.g. AdminThemeReno)
+	protected $templateSelector;
+	protected $segs = array();
+	protected $urlSeg1;
+	protected $urlSeg2;
+	protected $urlSeg3;
+
+	// for external Classes that extend this module
+	protected $mmRender;
+	protected $mmUtilities;
+	protected $jfu;
+
+	// user @access-control => permissions
+	protected $noPublish;// user cannot (un)publish
+	protected $noLock;// cannot (un)lok
+	protected $noDelete;// cannot trash/delete
+	protected $noEdit;// cannot edit
+	protected $noSettings;// cannot save settings
+	protected $noUpload;// cannot upload/scan (hence cannot create media)
+
+
+	/* ######################### - SET UP - ######################### */
+
+	/**
+	 * Set some key properties for use throughout the class.
+	 *
+	 * @access public
+	 *
+	 */
+    public function __construct() {
+
+       	/******** - PERMISSIONS CHECK - *******/
+		$this->noPublish = $this->permissions->get('media-manager-publish')->id && !$this->user->hasPermission('media-manager-publish') ? true : false;
+		$this->noLock = $this->permissions->get('media-manager-lock')->id && !$this->user->hasPermission('media-manager-lock') ? true : false;
+		$this->noDelete= $this->permissions->get('media-manager-delete')->id && !$this->user->hasPermission('media-manager-delete') ? true : false;
+		$this->noEdit = $this->permissions->get('media-manager-edit')->id && !$this->user->hasPermission('media-manager-edit') ? true : false;
+		$this->noSettings = $this->permissions->get('media-manager-settings')->id && !$this->user->hasPermission('media-manager-settings') ? true : false;
+		$this->noUpload = $this->permissions->get('media-manager-upload')->id && !$this->user->hasPermission('media-manager-upload') ? true : false;
+
+
+		/******** - SCRIPTS AND STYLES - *******/
+
+		$config = $this->wire('config');
+		$input = $this->wire('input');
+
+		$url = $config->urls->ProcessPageLister;
+		$config->styles->add($url . "ProcessPageLister.css");
+		$config->scripts->add($url . "ProcessPageLister.js");
+
+		/******** - UPLOADS DIRECTORIES - *******/
+
+		$this->mediaUploadsDir = $config->paths->assets . 'MediaManager/';
+		$this->mediaUploadsURL = $config->urls->assets . 'MediaManager/';
+
+		// by default, we (jfu) upload to a non-accessible folder
+		$this->privateMediaUploadsDir = $this->mediaUploadsDir . 'jqfu/.files_no_show/';
+		if(!is_dir($this->privateMediaUploadsDir)) wireMkdir($this->privateMediaUploadsDir, true);
+
+		// create scans 'uploads' directory if it doesn't exist
+		if(!is_dir($this->mediaUploadsDir . 'uploads/')) wireMkdir($this->mediaUploadsDir . 'uploads/', true);
+
+
+		/******** - MEDIA MANAGER SETTINGS - *******/
+
+		$mediaManagerSettings = $this->wire('page')->child('template=media-manager-settings, include=hidden')->media_manager_settings;
+		$savedSettings = json_decode($mediaManagerSettings, true);
+		if(!is_array($savedSettings)) $savedSettings = array();
+
+		$this->savedSettings = $savedSettings;
+
+		parent::__construct();
+
+
+		/******** - LISTER SETTINGS - *******/
+
+		$this->set('limitFields', array());
+		$this->set('toggles', array());
+		$this->set('defaultSort', '');// field to sort by; default is '-modified'
+		$this->set('allowBookmarks', '');
+		$this->set('initSelector', '');
+
+		$this->extraCSSClass = $this->adminTheme == 'AdminThemeReno' ? 'Reno' : '';
+
+		// include helper classes
+		$dir = dirname(__FILE__);
+		require_once("$dir/MediaManagerRender.php");
+		require_once("$dir/MediaManagerUtilities.php");
+		require_once("$dir/MediaManagerActions.php");
+		require_once("$dir/MediaManagerTabs.php");
+
+		###########
+
+		$sanitizer = $this->wire('sanitizer');
+		$urlSeg1 =  $sanitizer->pageName($input->urlSegment1);
+		$urlSeg2 = $input->urlSegment2;// current pageID - current fieldID combo {joined by hyphen}
+		// split $urlSeg2 to get currentPageID and currentFieldID
+		$IDs = explode('-', $urlSeg2 );
+		$currentPageID =  isset($IDs[0]) ? (int) $IDs[0] : '';
+		$currentFieldID = isset($IDs[1]) ? (int) $IDs[1] : '';
+
+
+		// if in add [insert] media to InputfieldMediaManager mode (modal)
+		// we need these to send to config->js
+		if($urlSeg1 == 'add' && $currentPageID && $currentFieldID) {
+				// get the current page
+				$p = $this->wire('pages')->get($currentPageID);
+				if($p && $p->id > 0) $this->currentPage = $p;
+				else throw new WireException($this->_('No page found to add media to!'));
+				// get the current media field (FieldtypeMediaManager/InputfieldMediaManager) on this page
+				$f = $this->wire('fields')->get($currentFieldID);
+				if($f && $f->id && $f->type instanceof FieldtypeMediaManager) $this->currentField = $f;
+				else throw new WireException($this->_('No instance of FieldtypeMediaManager found in the current page!'));
+
+		}
+
+	}
+
+	/**
+	 * Initialise the module. This is an optional initialisation method called before any execute methods.
+	 *
+	 * Initialises various class properties ready for use throughout the class.
+	 *
+	 * @access public
+	 *
+	 */
+	public function init() {
+
+		// @access-control: media-manager
+		if ($this->permissions->get('media-manager')->id && !$this->user->hasPermission('media-manager'))
+			 throw new WirePermissionException($this->_('Media Manager: You have no permission to use this module.'));
+
+		parent::init();
+
+		$this->ajaxconfigs();
+
+		$this->mmRender = new MediaManagerRender();
+		$this->mmUtilities = new MediaManagerUtilities();
+		$this->jfu = new JqueryFileUpload();
+
+		$config = $this->wire('config');
+		$url = $config->urls->$this;
+		$sanitizer = $this->wire('sanitizer');
+
+		// get sanitised url segments
+		$urlSegments = $this->mmUtilities->getURLSegments();
+		$this->urlSeg1 = $urlSeg1 =  $urlSegments[0];
+		$this->urlSeg2 = $urlSeg2 =  $urlSegments[1];
+		$this->urlSeg3 = $urlSeg3 =  $urlSegments[2];
+
+		/******** - JQUERY FILE UPLOAD SCRIPTS AND STYLES - *******/
+
+		// only output jfu scripts and styles when on upload page
+		if(($urlSeg1 == 'upload') || ($urlSeg1 == 'add' && $urlSeg3 == 'upload') || ($urlSeg1 == 'link' && $urlSeg2 == 'upload') || ($urlSeg1 == 'rte' && $urlSeg2 == 'upload')) {
+			$this->jfu->configJFUScripts();// jqueryfileupload scripts (config->scripts->add())
+			$this->jfu->configJFUStyles();
+		}
+
+		/******** - JQUERY BLUEIMP GALLERY SCRIPTS AND STYLES - *******/
+
+		// needed for gallery preview of images + variations (using this instead of magnific due to touch support
+		// only on 'all' and 'image' pages
+		if(!$urlSeg1 || $urlSeg1 == 'image' || ($urlSeg1 == 'add' && !$urlSeg3) || ($urlSeg1 == 'add' && $urlSeg3 == 'image')) {
+			$jfuURL = $config->urls->JqueryFileUpload;
+			$config->scripts->add($jfuURL . "js/gallery/jquery.blueimp-gallery.min.js");
+			$config->styles->add($jfuURL . 'css/blueimp-gallery.min.css');
+		}
+		/******** - JQUERY FILE UPLOAD CONFIG SETTINGS - *******/
+
+		$this->jfu->configsJFU($this->configsJFUOptions());
+
+
+		/******** - WIRETABS INITIALIZE - *******/
+
+		$this->wire('modules')->get('JqueryWireTabs');
+
+
+		/******** - SELECTORS FOR LISTER STUFF - *******/
+
+		$noListerArray = array('upload', 'settings', 'cleanup');
+		// set lister properties only in right contexts
+		if(!in_array($urlSeg1, $noListerArray) && !in_array($urlSeg3, $noListerArray)) {
+			// check if in 'add to InputfieldMediaManager mode'
+			// if yes: check if there are disallowed media types
+			// if yes: remove them from find selector
+			$allowedMedia = $this->currentField && !is_null($this->currentField->allowedMedia) ? $this->currentField->allowedMedia : NULL;
+
+			// grab selector and other lister settings
+			$options = $this->mmUtilities->buildSelector($allowedMedia, $this->savedSettings, $urlSegments);
+
+			$this->mediaTypeStr = $options['seg'];
+
+
+			/******** - LISTER SETTINGS - *******/
+
+
+			// limit system fields to only the following. We don't need templates since these should be fixed for each media type respectively
+			/*$limitFields = array('title', 'id', 'name', 'status', 'modified','created','published','modified_users_id','created_users_id', 'limit', 'sort', 'subfields', 'include', '_custom', $mediaField);
+			// set fields to show @todo: we leave this out for now since it seems to also affect subfields
+			$this->set('limitFields', $options['limitFields']);
+			*/
+
+			### custom settings, overriding lister defaults ###
+			// From parent:: @property array $toggles One or more of: collapseFilters, collapseColumns, noNewFilters, disableColumns, noButtons [empty]
+			// toggles: collapseFilters, collapseColumns, noNewFilters, disableColumns, noButtons
+
+			// we don't need columns in our renderResults(); we are not using tabulated results
+			$this->set('toggles', $options['toggles']);// array
+
+			// @todo - MAKE CONFIGURABLE IN SETTINGS
+			// date format for native properties: created and modified
+			/*$this->set('nativeDateFormat', $this->_('rel')); */
+
+			$this->set('defaultSort', $options['defaultSort']);// field to sort by; default is '-modified'
+			$this->set('allowBookmarks', $options['allowBookmarks']);
+
+			// the default selector string that appears but MAY be removed or changed [title%=]
+			$this->set('defaultSelector', $options['defaultSelector']);// we don't really need to select by template
+
+			// initial selector (that user cannot change)
+			// Weed out admin pages + the current page => no admin children; no admin; no trash, no current page and no 404 page
+			#$this->set('initSelector', "id!=7, id!=2, id!=27, limit=$limit, $mediaSelector");
+			$this->set('initSelector', $options['initSelector']);
+
+		}
+
+
+
+	}
+
+	/* ######################### - EXECUTE PAGES - ######################### */
+
+	/**
+	 * This function is executed when a page with this Process (MM) assigned is accessed.
+	 *
+	 * Displays all media available in the media library as well as their edit form.
+	 *
+	 * @access public
+	 * @return String $out Markup of display of media.
+	 *
+	 */
+	public function execute() {
+		$out = $this->mmRender->renderMenu() . $this->jfu->renderGalleryWidget(false) . parent::execute();
+		return $out;
+	}
+
+	/**
+	 * Show audio media.
+	 *
+	 * We append our actions panel and use the page to filter, search for and select audio media to action.
+	 *
+	 * @access public
+	 * @return String $out Markup of rendered audio media results, menu and action panel.
+	 *
+	 */
+	public function executeAudio() {
+		$out = $this->mmRender->renderMenu() . parent::execute();
+		return $out;
+	}
+
+	/**
+	 * Show document media.
+	 *
+	 * We append our actions panel and use the page to filter, search for and select document media to action.
+	 *
+	 * @access public
+	 * @return String $out Markup of rendered document media results, menu and action panel.
+	 *
+	 */
+	public function executeDocument() {
+		$out = $this->mmRender->renderMenu() . parent::execute();
+		return $out;
+	}
+
+	/**
+	 * Show image media.
+	 *
+	 * We append our actions panel and use the page to filter, search for and select image media to action.
+	 *
+	 * @access public
+	 * @return String $out Markup of rendered image media results, menu and action panel.
+	 *
+	 */
+	public function executeImage() {
+		$out = $this->mmRender->renderMenu();
+		if(($this->urlSeg1!= 'rte') &&($this->urlSeg1 !='link')) $out .= $this->jfu->renderGalleryWidget(false);
+		$out .= parent::execute();
+		return $out;
+	}
+
+	/**
+	 * Show video media.
+	 *
+	 * We append our actions panel and use the page to filter, search for and select media to action.
+	 *
+	 * @access public
+	 * @return String $out Markup of rendered video media results, menu and action panel.
+	 *
+	 */
+	public function executeVideo() {
+		$out = $this->mmRender->renderMenu() . parent::execute();
+		return $out;
+	}
+
+	/**
+	 * Show upload form.
+	 *
+	 * Consists of tabs for jfu files widget, scan, and uploads' help.
+	 *
+	 * @access public
+	 * @return String $out Markup of rendered upload interface.
+	 *
+	 */
+	public function executeUpload() {
+		// @access-control: media-manager-upload
+		if($this->noUpload) $this->session->redirect($this->wire('page')->url);
+		return $this->mmRender->renderUploadForm($this->savedSettings);
+	}
+
+	/**
+	 * Show settings form.
+	 *
+	 * Consists of various inputs for in/outputting Media Manager settings.
+	 *
+	 * @access public
+	 * @return String $out Markup of rendered settings form.
+	 *
+	 */
+	public function executeSettings() {
+		$out = $this->mmRender->renderMenu() . $this->mmRender->renderSettings($this->savedSettings);
+		return $out;
+	}
+
+	/**
+	 * Landing modal page for adding media to a page being edited.
+	 *
+	 * Add (insert) and Upload are the only actions here.
+	 * Add adds selected media to the current page.
+	 * Upload adds media to the Media Library.
+	 *
+	 * @access public
+	 * @return String $out Markup of rendered results for adding to a page.
+	 *
+	 */
+	public function executeAdd() {
+
+		// if page accessed directly (i.e. no curentPageID-currentFieldID in urlSeg2, redirect to MM home page)
+		if(!$this->urlSeg2) $this->session->redirect($this->wire('page')->url);
+
+		// show respective media types OR upload
+		// else ( i.e., no urlSegment or urlSegment unknown or urlSegment1 == all) show all media
+		if($this->urlSeg3 == 'audio') 		$out = $this->executeAudio();
+		elseif($this->urlSeg3 == 'document')	$out = $this->executeDocument();
+		elseif($this->urlSeg3 == 'image')		$out = $this->executeImage();
+		elseif($this->urlSeg3 == 'video')		$out = $this->executeVideo();
+		elseif($this->urlSeg3 == 'upload')	$out = $this->executeUpload();
+		elseif($this->urlSeg3 == 'settings')	$out = $this->executeSettings();
+		else $out = $this->mmRender->renderMenu() . $this->jfu->renderGalleryWidget() . parent::execute();
+
+		return $out;
+
+	}
+
+	/**
+	 * Landing modal page for selecting image media for adding to CKEditor textarea.
+	 *
+	 * There are no actions here.
+	 * On selection, ProcessPageEditImageSelect takes control.
+	 *
+	 * @access public
+	 * @return String $out Markup of rendered image media to insert in a page.
+	 *
+	 */
+	public function executeRte() {
+		if($this->urlSeg2 == 'upload') $out = $this->executeUpload();
+		elseif($this->urlSeg2 == 'settings') $out = $this->executeSettings();
+		else $out = $this->executeImage();
+		return $out;
+	}
+
+	/**
+	 * Landing modal page for selecting media link for adding to CKEditor textarea.
+	 *
+	 * There are no actions here.
+	 * On selection, ProcessPageEditLink takes some control.
+	 *
+	 * @access public
+	 * @return String $out Markup of rendered media to insert as links in a page.
+	 *
+	 */
+	public function executeLink() {
+		if($this->urlSeg2 == 'upload') $out = $this->executeUpload();
+		elseif($this->urlSeg2 == 'settings') $out = $this->executeSettings();
+		else $out = $this->mmRender->renderMenu() . parent::execute();
+		return $out;
+	}
+
+	/**
+	 * Shows filter configurations profile page.
+	 *
+	 * This is rendered in a modal.
+	 * Enables the creation, setting and editing of filter profiles
+	 *
+	 * @access public
+	 * @return String $out Markup of filter profiles form.
+	 *
+	 */
+	public function executeFilter() {
+		$out = '';
+		$savedSettings = $this->savedSettings;
+		// error message just in case filters page accessed directly in browser and filter profiles set not to be shown
+		if(!isset($savedSettings['show_filter_profiles'][0]) || $savedSettings['show_filter_profiles'][0] == 2) {
+			return '<h2>' . $this->_('Sorry, You have no access to this page') . '</h2>';
+		}
+		if($this->urlSeg2) $out = $this->mmRender->renderFilterConfigEdit();
+		else $out = $this->mmRender->renderFilterConfig();
+		return $out;
+	}
+
+	/**
+	 * Cleanup markup.
+	 *
+	 * Superusers only.
+	 * Removes all Media Manager components (fields, templates, template file and pages).
+	 * Needs to be used before uninstalling the module for a clean uninstall.
+	 *
+	 * @access public
+	 * @return String $out Markup of cleanup.
+	 *
+	 */
+	public function executeCleanup() {
+
+		if (!$this->user->isSuperuser()) {
+				$this->error($this->_("Sorry you cannot view that page. Only Superusers allowed access."));
+				$this->session->redirect($this->wire('page')->url);// redirect to main media maanager page
+		}
+
+		$out = $this->mmRender->renderMenu() . $this->mmRender->renderCleanup();
+		return $out;
+
+	}
+
+	/* ######################### - JFU CONFIGS - ######################### */
+
+
+	/**
+	 * Outputs array of jQueryFileUpload configuration settings.
+	 *
+	 * This will be eventually sent to the browers using $jfu->configsJFU().
+	 *
+	 * @access private
+	 * @return Array $configs Configuration settings.
+	 *
+	 */
+	private function configsJFUOptions() {
+
+		$configs = array();
+		$savedSettings = $this->savedSettings;
+		$fields = $this->wire('fields');
+
+		$url = $this->wire('config')->urls->admin . 'media-manager/ajax/';
+		// pipe separated for jfu
+		$validExts = implode('|', $this->mmUtilities->validExtensions());// @note: not saved to media_manager_settings
+		$imageMaxWidth = $fields->get('media_manager_image') ? $fields->get('media_manager_image')->maxWidth : '';// @note: -ditto-
+		$imageMaxHeight = $fields->get('media_manager_image') ? $fields->get('media_manager_image')->maxHeight : '';// @note: -ditto-
+
+		// uploads: check if 'add to media library + (un)publish' setting is in place
+		$uploadAndCreate = isset($savedSettings['after'][0]) ? (int) $savedSettings['after'][0] : 2;
+		if($uploadAndCreate === 3) $showUploaded = 1;// if will manually add uploaded files to Media Library, then we show uploaded files
+		else $showUploaded = 0;// else we don't display uploaded files if after upload, files will immediately be added to Media Library
+
+		// jfu configs to send to browser. @note: ditto + we merge with $url + acceptFileTypes + other stuff in jqfu that we don't want to change here, e.g. paramName, etc
+		$defaultConfigsJFUOptions = array(
+			'url' => $url,
+			'acceptFileTypes' => $validExts,// combined from our media manager media fields extensions settings
+			'imageMaxWidth' => $imageMaxWidth,// from media_manager_image field
+			'imageMaxHeight' => $imageMaxHeight,// -ditto-
+			'showUploaded' => $showUploaded,// custom option: depends on 'after' upload what to do; if opt 3, then show uploaded is 1 (true), otherwise 0 (false)
+		);
+
+		$validationSettings = isset($savedSettings['validation']) ? $savedSettings['validation'] : array();
+		$modeSettings = isset($savedSettings['mode']) ? $savedSettings['mode'] : array();
+		$imageSettings = isset($savedSettings['image']) ? $savedSettings['image'] : array();
+		$audioSettings = isset($savedSettings['audio']) ? $savedSettings['audio'] : array();
+		$videoSettings = isset($savedSettings['video']) ? $savedSettings['video'] : array();
+		$documentSettings = isset($savedSettings['document']) ? $savedSettings['document'] : array();
+
+		// for unsetting WireUpload specific settings
+		$wuSettings = array('setOverwrite', 'setLowercase', 'setOverwriteFilename');
+
+		foreach ($validationSettings as $key => $value) {
+
+			// remove WireUpload specific settings
+			if(in_array($key, $wuSettings)) unset($validationSettings[$key]);
+			// shared WireUpload and jfu setting
+			elseif(isset($validationSettings['setMaxFileSize'])) {
+				$validationSettings['maxFileSize'] = $validationSettings['setMaxFileSize'];
+				unset($validationSettings['setMaxFileSize']);// remove the WireUploadsetting
+			}
+			// shared WireUpload and jfu setting
+			elseif(isset($validationSettings['setMaxFiles'])) {
+				$validationSettings['maxNumberOfFiles'] = $validationSettings['setMaxFiles'];
+				unset($validationSettings['setMaxFiles']);// remove the WireUploadsetting
+			}
+
+		}
+
+		// merge the various settings
+		$configs = array_merge($defaultConfigsJFUOptions, $validationSettings, $modeSettings, $imageSettings, $audioSettings, $videoSettings, $documentSettings);
+
+		// get back our boolean values that were json_encode'ed as strings
+		foreach ($configs as $key => $value) {
+			if($value === 'true') $configs[$key] = true;
+			elseif($value === 'false') $configs[$key] = false;
+		}
+
+		return $configs;
+
+	}
+
+
+	/* ######################### - AJAX - ######################### */
+
+	/**
+	 * Outputs javascript configuration values for this module.
+	 *
+	 * @access protected
+	 * @return $scripts string.
+	 *
+	 */
+	protected function ajaxConfigs() {
+
+		$currentPageID = $this->currentPage ? (int) $this->currentPage->id : '';
+		$currentFieldID = '';
+		$currentFieldInsertAndClose = '';
+		if($this->currentField) {
+			$currentFieldID = (int) $this->currentField->id;
+			$currentFieldInsertAndClose = (int) $this->currentField->insertAndClose;
+		}
+
+		$url = $this->wire('config')->urls->admin . 'media-manager/ajax/';
+
+		// options for ajax calls
+		$options = array('config' => array(
+											'currentPageID' => $currentPageID,
+											'currentFieldID' => $currentFieldID,
+											'ajaxURL' => $url,
+											'insertAndClose' => $currentFieldInsertAndClose,
+											'urlSeg1' => $currentFieldInsertAndClose,
+									)
+					);
+
+		$scripts = $this->wire('config')->js($this->className(), $options);
+
+		return $scripts;
+
+	}
+
+	/**
+	 * A URL for receiving ajax calls and passing these on for processing.
+	 *
+	 * Actions include editing, inserting in page (adding) uploading, scanning, (un)publishing, (un)locking, trashing or deleting media.
+	 *
+	 * @access public
+	 * @return $data String JSON-encoded string.
+	 *
+	 */
+	public function executeAjax() {
+
+		if ($this->wire('config')->ajax) {
+
+			$data = array();// for our JSON to feed back
+			$media = array();// media to action selected (i.e. the pages themselves) or uploaded
+			$publish = 0;
+			$options = array();// various options for action methods
+
+			// determine whodunnit
+			$input = $this->wire('input')->post;
+
+			// grab and sanitize sent inputs
+			$actionType = $input->action;// type of action (see below)
+			$scan = (int) $input->scan;
+			$scanPublish = (int) $input->scan_publish;// whether to scan and publish
+
+			$currentPageID = (int) $input->current_page_id;// current page id (for insert mode)
+			$currentFieldID = (int) $input->current_field_id;// current FieldtyepMediaManager field on the current page (for insert mode)
+			$media = $input->media;// array
+			$pageID = (int) $input->pageid;// for edit mode
+			$type = $input->type;
+			$variationsParentID = (int) $input->variationsparentid;// this is for when deleting variations only (via dropdown select)
+			$variationsDescriptions = $input->variations_desc;// variations descriptions array (sanitized later)
+			$variationsTags = $input->variations_tags;// variations tags - ditto
+			$subaction = $input->subaction;
+			$tagMode = (int) $input->tag_mode;// 0=update existing tags; 1=replace existing tags
+
+			$options['variations_parent_id'] = $variationsParentID;
+
+			############### - jfu stuff - ###############
+			$uploads = isset($_FILES['files']) && count($_FILES['files']) ? true : false;
+			$list = $this->wire('sanitizer')->name($input->jfu_list);
+			$delete = $this->wire('sanitizer')->name($input->jfu_delete);
+			#############################################
+
+			$this->mmActions = new MediaManagerActions();
+
+			// dealing with non-upload actions (publish, trash, etc)
+			if(is_array($media) && count($media)) {
+
+				if($actionType == 'insert') {
+					// get the current page
+					$p = $this->wire('pages')->get($currentPageID);
+					if($p && $p->id > 0) $this->currentPage = $p;
+					else {
+							$data['message'] = 'error';
+							$data['error'] = $this->_('No page found to add media to!');
+					}
+					// get the current media field (FieldtypeMediaManager/InputfieldMediaManager) on this page
+					$f = $this->wire('fields')->get($currentFieldID);
+					if($f && $f->id && $f->type instanceof FieldtypeMediaManager) $this->currentField = $f;
+					else {
+							$data['message'] = 'error';
+							$data['error'] = $this->_('No instance of FieldtypeMediaManager found in the current page!');
+					}
+
+					$options['current_page'] = $this->currentPage;
+					$options['current_field'] = $this->currentField;
+
+				}
+
+				// Description and Tags input for image variations
+				if($actionType == 'edit') {
+					$options['pageid'] = $pageID;
+					$options['type'] = $type;
+					$options['subaction'] = $subaction;
+					if($variationsDescriptions)	 {
+						$options['variations_description'] = $variationsDescriptions;
+						$options['variations_tags'] = $variationsTags;
+					}
+				}
+
+				// tagging
+				if($actionType == 'tag') {
+					$options['tag_mode'] = $tagMode;
+					$tags = $input->tags;
+					$options['tags'] = $tags;
+				}
+
+
+
+				$data = $this->mmActions->actionMedia($actionType, $media, $options);
+			}
+
+			elseif($scan === 1) {
+
+					$actionType = 'scan';
+					$options['dir'] = $this->mediaUploadsDir . 'uploads/';
+					$options['scan_publish'] = $scanPublish;
+
+					$data = $this->mmActions->actionMedia($actionType, $media, $options);
+			}
+
+			// auto-upload by JqueryFileUPload (file or drag and drop)
+			elseif($uploads || $list === 'list' || $delete === 'delete') {
+				$processJFUAjaxOptions = $this->processJFUAjaxOptions();// jfu options for processing ajax requests (not configs!)
+				$data = $this->jfu->processJFUAjax($processJFUAjaxOptions);
+
+				// uploads: check if 'add to media library + (un)publish' setting is in place
+				$uploadAndCreate = isset($this->savedSettings['after'][0]) ? (int) $this->savedSettings['after'][0] : 2;
+
+				if($uploads && ($uploadAndCreate === 1 || $uploadAndCreate === 2)) {
+					if($uploadAndCreate === 1) $publish = 1;
+					else $publish = 0;
+
+					$actionType = 'upload';// add to media library after an ajax request (immediately after a jfu event)
+					// @note: if 'after' is 1|2 it means we are not showing uploads (i.e. immediately adding to ML) which then means we are uploading to the private directory
+					$options['dir'] = $processJFUAjaxOptions['privateUploadsDir'];
+					$options['thumb'] = $processJFUAjaxOptions['thumbsPrivateDir'];
+					$options['publish'] = $publish;
+					$options['after'] = $uploadAndCreate;// to help determine which $dir above to use (i.e. private vs. web-accessible)
+					$this->mmActions->actionMedia($actionType, null, $options);
+
+					# nothing else to do. $this->message()/$this->error() sent via actionMedia() & below we json_encode and send $data
+
+				}
+
+			}
+
+			else {
+				$data['message'] = 'error';
+				$data['error'] = $this->_('You did not enter links or select scan.');
+			}
+
+			echo json_encode($data);
+			exit;
+
+		}// end if ajax
+
+		else $this->session->redirect($this->wire('page')->url);
+
+	}
+
+	/**
+	 * Options for passing on to JqueryFileupload processJFUAjax().
+	 *
+	 * @access protected
+	 * @return $processJFUAjaxOptions Array of options for processing jfu actions.
+	 *
+	 */
+	protected function processJFUAjaxOptions() {
+
+		$config = $this->wire('config');
+
+		$baseUploadsDir = $this->mediaUploadsDir;
+		$baseUploadsURL = $this->mediaUploadsURL;
+
+		$uploadsDir = $baseUploadsDir . 'jqfu/files/';// web accessible directory
+		$thumbsDir = $baseUploadsDir . 'jqfu/files/thumbnails/';// ditto
+		$uploadsURL = $baseUploadsURL . 'jqfu/files/';// ditto
+		$thumbsURL = $baseUploadsURL . 'jqfu/files/thumbnails/';// ditto
+
+		$exts = implode(' ', $this->mmUtilities->validExtensions());// we need a string acceptFileTypes. Will be converted to array before passing to WireUpload in jfu
+
+		// uploads: check if 'add to media library + (un)publish' setting is in place
+		$uploadAndCreate = isset($this->savedSettings['after'][0]) ? (int) $this->savedSettings['after'][0] : 2;
+		if($uploadAndCreate === 3) $showUploaded = 1;// if will manually add uploaded files to Media Library, then we show uploaded files
+		else $showUploaded = 0;// else we don't display uploaded files if after upload, files will immediately be added to Media Library
+		$processJFUAjaxOptions = array (
+				'uploadsDir' => $uploadsDir,// @note: accessible only within admin
+				'thumbsDir' => $thumbsDir,// ditto
+				'uploadsURL' => $uploadsURL,// ditto
+				'thumbsURL' => $thumbsURL,// ditto
+				'privateUploadsDir' => $this->privateMediaUploadsDir,// @note: non-web-accessible
+				'thumbsPrivateDir' => $this->privateMediaUploadsDir . 'thumbnails/',// jfu will force create if it doesn't exist
+				'showUploaded' => $showUploaded,// @todo: configurable! e.g. do we need this if 'after upload' setting is 1 or 2? no!
+				'responseType' => 2,
+				'acceptFileTypes' => $exts,
+				'uploadsDeletable' => 1,
+				'createThumb' => true,
+				#'disableUploads' => true,# @note: make configurable in Upload/settings tab or use permissions? Using noUpload permission
+				'allowedImageMimeTypes' => $this->mmUtilities->allowedImageMimeTypes(),
+				'allowedNonImageMimeTypes' => $this->mmUtilities->allowedNonImageMimeTypes(),
+		);
+
+		return $processJFUAjaxOptions;
+
+	}
+
+	/* ######################### - PageLister STUFF - ######################### */
+
+	/**
+	 * Modify this Lister's parent InputfieldSelector instance.
+	 *
+	 * For results filtering.
+	 * We hide specified fields from filters.
+	 * @note: We are overriding parent::getInputfieldSelector().
+	 *
+	 * @access public
+	 * @return $gis InputfieldSelector.
+	 *
+	 */
+	public function getInputfieldSelector() {
+		$gis = parent::getInputfieldSelector();// parent's InputfieldSelector
+		// get custom setting for fields to be excluded & set to filter if user does not have permission  'media-manager-show-all-filters'
+		if ($this->mediamanagerField && $this->mediamanagerField->excludeFields && !$this->user->hasPermission('media-manager-show-all-filters')) {
+			$gis->set('exclude', "$gis->exclude, {$this->mediamanagerField->excludeFields}");
+		}
+		return $gis;
+
+	}
+
+	/**
+	 * Find media in the Media Library.
+	 *
+	 * @access protected
+	 * @return $results PageArray of found results (if found).
+	 *
+	 */
+	protected function findMedia() {
+		$gs = parent::getSelector();// selector saved in session by parentClass
+		$results = parent::findResults($gs);
+		return $results;
+	}
+
+	/**
+	 * Display media in Media Library.
+	 *
+	 * @note: We are overriding parent::renderResults().
+	 *#
+	 * @access protected
+	 * @return String $out Markup of results.
+	 *
+	 */
+	protected function renderResults() {
+		$results = $this->findMedia();
+		$fs = $this->wire('config')->debug ? $this->wire('sanitizer')->entities($this->finalSelector) : '';
+		$out = $this->mmRender->renderViews($results, $fs, $this->mediaTypeStr);
+		return $out;
+	}
+
+	/**
+	 * Change inputfield selector's label to match Media Manager context.
+	 *
+	 * Default label is 'What pages to show'.
+	 * We override this.
+	 * @note: We are overriding parent::buildFiltersForm().
+	 *
+	 * @access protected
+	 * @return $form Object Filters Form.
+	 *
+	 */
+	protected function buildFiltersForm() {
+		$form = parent::buildFiltersForm();
+		$is = $form->get('filters');// @note: we are grabbing this forms child input (InputfieldSelector) by its name
+		$is->label = $this->_('What media to show');// we want a custom label here
+		return $form;
+	}
+
+	/**
+	 * Shows an extra tab in the Media Library which we use to link to filter configurations.
+	 *
+	 * This enables users to create custom filters for media views in Media Manager Library.
+	 * Filters here are become the defaultSelector.
+	 * We are overridding parent::buildColumnsForm.
+	 *
+	 * @access protected
+	 * @return String $out Markup to be used in the WireTab.
+	 *
+	 */
+	public function renderExtras() {		
+		$savedSettings = $this->savedSettings;
+		$parentExtras = parent::renderExtras();
+		if(!isset($savedSettings['show_filter_profiles'][0]) || $savedSettings['show_filter_profiles'][0] == 2) return $parentExtras;		
+		$out = "<div id='MediaManagerFiltersConfigTab' title='" . $this->_('Config') . "' class='WireTab'></div>";
+		$out .= $parentExtras;		
+		return $out;
+	}
+
+	/**
+	 * Execute the 'reset' action, which resets columns, filters, and anything else stored in the session.
+	 *
+	 * We are overriding parent::executeReset() to avoid redirecting to root || this process page.
+	 * In our case, we are only resetting fitlers since we don't show columns, etc.
+	 *
+	 * @access public
+	 *
+	 */
+	public function executeReset() {
+
+		$segs = array('add', 'rte', 'link');
+
+		$urlStr = $this->wire('input')->urlSegmentsStr ? $this->wire('input')->urlSegmentsStr . '/' : '';
+		$modal = in_array($this->urlSeg1, $segs) ? '?modal=1' : '';// maintain modal status when in add or rte mode
+		$url = $this->wire('page')->url . $urlStr . $modal;
+
+		$this->resetLister();
+		// $this->message($this->_('All settings have been reset.'));// won't work in this context
+		$this->session->redirect($url);
+
+	}
+
+	/* ######################### - MODULE CONFIG - ######################### */
+
+	/**
+	 * Module configuration interface.
+	 *
+	 * Displayed in module configuration screen. This is a ProcessWire method
+	 * User configurable values stored in the database.
+	 * Here we only use it to warn user to first run Media Manager cleanup utility before uninstaling the module
+	 *
+	 * @access public
+	 * @return mixed $form rendered form
+	 *
+	 */
+	 public static function getModuleConfigInputfields(array $data) {
+
+		// create the config screen
+		$form = new InputfieldWrapper();
+
+		$m = new InputfieldMarkup;
+		$m->label = __('Uninstall Warning');
+
+		$cleanupURL = '<a target="_blank" href="' . wire('config')->urls->admin . 'media-manager/cleanup/">' . __('Cleanup utility') . '</a>';
+
+		$warning = '<h3 class="warning notes">' . __('Do not uninstall Media Manager until AFTER you have run the ') . $cleanupURL .
+					__(' unless you only want to keep your Media Manager Pages without using the module.') . '</h3>';
+
+		$m->attr('value', $warning);
+		$form->add($m);
+
+		return $form;
+
+	 }
+
+	/* ######################### - INSTALLERS - ######################### */
+
+	private function mmInstaller($mode) {
+
+		// run Media Manager installer
+		/*
+			- installs 5 templates (1 for each media type child pages + 1 for the parent pages)
+			- 5 fields (1 for each media type child pages + 1 for settings)
+		 */
+
+		require_once(dirname(__FILE__) . '/MediaManagerInstaller.php');
+
+		$mmi = new MediaManagerInstaller();
+
+		return $mmi->verifyInstall($mode);
+
+	}
+
+	/**
+	 * Called once only when installing the module.
+	 *
+	 * Creates a page for this process and a permission for the module.
+	 *
+	 * @access public
+	 *
+	 */
+	public function ___install() {
+
+
+		// create ProcessMediaManager admin page and permission if MediaManagerInstaller was successful in its validation
+		if($this->mmInstaller($mode = null) == true) {
+				$page = new Page();
+				$page->template = 'admin';
+				$page->parent = $this->wire('pages')->get($this->wire('config')->adminRootPageID);
+				$page->title = 'Media Manager';
+				$page->name = self::PAGE_NAME;
+				$page->process = $this;
+				#$page->addStatus(Page::statusHidden);
+				$page->save();
+
+				$this->mmInstaller($mode = 1);// run MediaManagerInstaller
+
+				// tell the user we created this page
+				$this->message("Media Manager: Created page {$page->path}");
+
+		}
+
+		else throw new WireException($this->_('Media Manager: Installation aborted. Check and fix reported errors first.'));
+
+		// create the permission 'media-manager' and 'media-manager-settings' to limit access to the module
+		$perms = array(
+						'media-manager' => $this->_('Use Media Manager'),
+						'media-manager-settings' => $this->_('Edit Media Manager Settings'),
+		);
+
+		foreach ($perms as $k => $v) {
+			$permission = $this->permissions->get($k);
+			if (!$permission->id) {
+				$p = new Permission();
+				$p->name = $k;
+				$p->title = $v;
+				$p->save();
+			}
+		}
+
+		// tell the user we created this module's permissions
+		$this->message('Media Manager: Created new permissions media-manager and media-manager-settings.');
+
+	}
+
+	/**
+	 * Called only when uninstalling the module.
+	 *
+	 * Uninstalls the module, deletes the process page and the permission that were created on install.
+	 *
+	 * @access public
+	 *
+	 */
+	public function ___uninstall() {
+
+
+		// find and delete the page we installed, locating it by the process field (which has the module ID)
+		// it would probably be sufficient just to locate by name, but this is just to be extra sure.
+		$moduleID = $this->wire('modules')->getModuleID($this);
+		// @note/@see executeCleanup()
+		$page = $this->wire('pages')->get("template=admin, process=$moduleID, name=" . self::PAGE_NAME);
+		// $page = $this->wire('pages')->get('template=admin, name='.self::PAGE_NAME);
+
+		if($page->id) {
+			// if we found the page, let the user know and delete it
+			$this->message($this->_('Media Manager: Deleted page ') . $page->path);
+			$this->wire('pages')->delete($page);
+		}
+
+		// find and delete the 'media-manager' and 'media-manager-settings' permissions and let the user know
+		$perms = array(
+						'media-manager' => $this->_('Use Media Manager'),
+						'media-manager-settings' => $this->_('Edit Media Manager Settings'),
+		);
+
+		foreach ($perms as $k => $v) {
+			$permission = $this->permissions->get($k);
+			if ($permission->id) {
+				$permission->delete();
+			}
+		}
+
+		// tell the user we created this module's permission
+		$this->message('Media Manager: Deleted permissions media-manager and media-manager-settings.');
+
+	}
+
+
+}

@@ -1,0 +1,343 @@
+<?php
+
+class EmailNewUser extends WireData implements Module, ConfigurableModule {
+
+    /**
+     * Data as used by the get/set functions
+     *
+     */
+    protected $data = array();
+    protected $newPass = "";
+
+
+   /**
+     * Default configuration for module
+     *
+     */
+    static public function getDefaultData() {
+            return array(
+                "automaticEmailSend" => 1,
+                "fromEmail" => wire('config')->adminEmail,
+                "generatePassword" => "",
+                "subject" => "",
+                "body" => "",
+                "passLength" => "9",
+                "availableSets" => array('l','u','d','s')
+            );
+    }
+
+    /**
+     * Populate the default config data
+     *
+     */
+    public function __construct() {
+       foreach(self::getDefaultData() as $key => $value) {
+               $this->$key = $value;
+       }
+    }
+
+    public function init() {
+        if($this->data['generatePassword']){
+            $this->addHookBefore('InputfieldPassword::render', $this, 'notRequiredNote');
+            $this->addHookBefore('InputfieldPassword::processInput', $this, 'removeRequired');
+        }
+        if(wire('page')->process == "ProcessUser") $this->addHookAfter('ProcessPageEdit::buildFormContent', $this, 'addEmailFields');
+        $this->addHookAfter('Password::setPass', $this, 'getPassword');
+        $this->pages->addHookBefore('saveReady', $this, 'sendNewUserEmail');
+    }
+
+    public function notRequiredNote(HookEvent $event) {
+        $process = $this->wire('process');
+        if($process instanceof WirePageEditor) {
+            $userpage = $process->getPage();
+            if($userpage->is(Page::statusUnpublished)) $event->object->notes = 'NB: Because you chose to automatically generate the password for new users, you can leave these blank. However, if you do enter a password here, it will override the generated one.';
+        }
+    }
+
+    public function removeRequired(HookEvent $event) {
+        $event->object->required = false; //hack to remove required status so that automatically generated password can be added on save
+    }
+
+    public function addEmailFields(HookEvent $event) {
+        $form = $event->return;
+        $page = $event->object->getPage();
+
+        $notes = '';
+        $forcePasswordChangeText = '';
+        $checked = '';
+        if(wire('modules')->isInstalled("PasswordForceChange")) $forcePasswordChangeText = __("\n\nIf you are relying on the automatically generated password, and/or you are including the password in the email, you should propbably check 'Force password change on next login'.");
+        if(!$page->is(Page::statusUnpublished)) {
+            $sendLabel = __("Re-send welcome message");
+            if($this->data['generatePassword']) $notes = __("WARNING: This will overwrite the user's existing password because you have the Generate Password option checked.\nYou can manually enter a new password to overwrite the automatically generated one.") . $forcePasswordChangeText;
+        }
+        else {
+            if($this->data['automaticEmailSend']) $checked = 'checked';
+            $sendLabel = __("Send welcome message");
+            if($this->data['generatePassword']) $notes = __("The system will generate an automatic password for the new user.") . $forcePasswordChangeText;
+        }
+
+        $f = wire('modules')->get('InputfieldCheckbox');
+        $f->attr('name', 'sendEmail');
+        $f->notes = $notes;
+        $f->label = $sendLabel;
+        $f->showIf = "email!=''";
+        $f->attr('checked', $checked);
+        $f->collapsed = Inputfield::collapsedBlank;
+        $form->append($f);
+
+        $f = wire('modules')->get('InputfieldTextarea');
+        $f->attr('name', 'emailMessage');
+        $f->label = "Email Message";
+        $f->showIf = "email!='', sendEmail=1";
+        $f->value = $this->data['body'];
+        $f->description = __("Body text for the email. Use this to overwrite the default message from the module config settings.");
+        $f->notes = __("Use: {name} and {pass}, or any other fields from the user template, eg. {first_name} in the text where you want them to appear in the email.\nPlease note that {adminUrl} and {fromEmail} are two special codes and not fields from the user template. These will return http://".wire('config')->httpHost.wire('config')->urls->admin." and {$this->data['fromEmail']}, respectively.");
+        $form->append($f);
+    }
+
+    /**
+     * Get the plain text version of a manually entered password
+     *
+     */
+    public function getPassword(HookEvent $event) {
+        $this->newPass = $event->arguments[0];
+    }
+
+
+    public function sendNewUserEmail(HookEvent $event) {
+
+        $page = $event->arguments(0);
+
+        if($this->page->process == 'ProcessUser' && !$this->input->sendEmail) return; // exit if in admin and sendEmail checkbox was not selected
+        if($this->page->process != 'ProcessUser' && !$this->data['automaticEmailSend'] && !$page->sendEmail) return; //exit if using API and automatic email send not checked
+        if($this->page->process == 'ProcessProfile') return; // exit if editing profile
+        if($page->template != "user") return; // exit if not user template
+
+        if($this->modules->isInstalled("PasswordForceChange") && $this->input->force_passwd_change && !$page->hasPermission("profile-edit")) {
+            $this->error($this->_("No email was sent to the user because of Force Password Change errors."));
+            return;
+        }
+
+        // if not using re-send option and the username already exists, exit now
+        // to get to this point with sendEmail not set, there must be an API call (template or other module)
+        if(!$this->input->sendEmail && $this->users->get($page->name)->id) {
+            return;
+        }
+
+        if($this->data['generatePassword'] && $this->newPass == ''){
+            $newPass = $this->generateStrongPassword($this->data['passLength'], false, implode(",", $this->data['availableSets']));
+            $page->pass = $newPass;
+            $this->message($this->_("The automatically generated password for {$page->name} is $newPass"));
+        }
+        else{ //manually entered only, or manually entered to override automatically generated password
+            $newPass = $this->newPass;
+        }
+
+        //replace curly braces codes with matching PW field names
+        $body = $this->input->emailMessage ? $this->sanitizer->textarea($this->input->emailMessage) : $this->data['body'];
+        $body = self::parseBody($body, $this->data['fromEmail'], $page, $newPass);
+
+        if($page->pass == '' || $page->email == ''){
+            $this->error($this->_("No email was sent to the new user because either their email address or password was not set."));
+        }
+        else{
+            $sent = wireMail($page->email, $this->data['fromEmail'], $this->data['subject'], $body);
+            if($sent) {
+                $this->message($this->_("{$page->name} was successfully sent a welcome email."));
+            }
+            else {
+                $this->error($this->_("No email was sent to the new user because of an unknown problem. Please try the 'Re-send Welcome Message' option."));
+            }
+        }
+
+    }
+
+
+    public static function parseBody($body, $fromEmail, $page, $newPass) {
+        if (preg_match_all('/{([^}]*)}/', $body, $matches)) {
+            foreach ($matches[0] as $match) {
+                $field = str_replace(array('{','}'), '', $match);
+
+                if($field == "pass") {
+                    $replacement = $newPass;
+                }
+                elseif($field == "adminUrl") {
+                    $replacement = "http://".wire('config')->httpHost.wire('config')->urls->admin;
+                }
+                elseif($field == "fromEmail") {
+                    $replacement = $fromEmail;
+                }
+                else {
+                    $replacement = $page->$field;
+                }
+
+                $body = str_replace($match, $replacement, $body);
+            }
+        }
+        return $body;
+    }
+
+
+    // https://gist.github.com/tylerhall/521810
+    // Generates a strong password of N length containing at least one lower case letter,
+    // one uppercase letter, one digit, and one special character. The remaining characters
+    // in the password are chosen at random from those four sets.
+    //
+    // The available characters in each set are user friendly - there are no ambiguous
+    // characters such as i, l, 1, o, 0, etc. This, coupled with the $add_dashes option,
+    // makes it much easier for users to manually type or speak their passwords.
+    //
+    // Note: the $add_dashes option will increase the length of the password by
+    // floor(sqrt(N)) characters.
+
+    public function generateStrongPassword($length = 9, $add_dashes = false, $available_sets = 'luds'){
+
+        $sets = array();
+        if(strpos($available_sets, 'l') !== false)
+            $sets[] = 'abcdefghjkmnpqrstuvwxyz';
+        if(strpos($available_sets, 'u') !== false)
+            $sets[] = 'ABCDEFGHJKMNPQRSTUVWXYZ';
+        if(strpos($available_sets, 'd') !== false)
+            $sets[] = '23456789';
+        if(strpos($available_sets, 's') !== false)
+            $sets[] = '!@#$%&*?';
+
+        $all = '';
+        $password = '';
+        foreach($sets as $set){
+            $password .= $set[array_rand(str_split($set))];
+            $all .= $set;
+        }
+
+        $all = str_split($all);
+        for($i = 0; $i < $length - count($sets); $i++)
+            $password .= $all[array_rand($all)];
+
+        $password = str_shuffle($password);
+
+        if(!$add_dashes)
+            return $password;
+
+        $dash_len = floor(sqrt($length));
+        $dash_str = '';
+        while(strlen($password) > $dash_len){
+            $dash_str .= substr($password, 0, $dash_len) . '-';
+            $password = substr($password, $dash_len);
+        }
+        $dash_str .= $password;
+        return $dash_str;
+    }
+
+    /**
+     * Return an InputfieldsWrapper of Inputfields used to configure the class
+     *
+     * @param array $data Array of config values indexed by field name
+     * @return InputfieldsWrapper
+     *
+     */
+    public static function getModuleConfigInputfields(array $data) {
+
+        $data = array_merge(self::getDefaultData(), $data);
+
+        $missing = 0;
+        if(!in_array('d', $data['availableSets'])) $missing++;
+        if(!in_array('l', $data['availableSets']) && !in_array('u', $data['availableSets'])) $missing++;
+        if($missing > 0) wire()->error(__("You need to have digits and at least one of the letter options checked."));
+
+        // send test email if requested
+        if (wire('input')->post->test) {
+            wireMail(wire('user')->email, $data['fromEmail'], $data['subject'], self::parseBody($data['body'], $data['fromEmail'], wire('user'), 'password'));
+        }
+
+
+        $wrapper = new InputfieldWrapper();
+
+        $f = wire('modules')->get("InputfieldCheckbox");
+        $f->attr('name', 'automaticEmailSend');
+        $f->label = __('Automatic Email Send');
+        $f->description = __('If checked, the "Send Welcome Message" option will be automatically checked for each new user when they are created.');
+        $f->notes = __('This also affects API additions of new users. If you want this unchecked and want to force the email to be sent for a specific new user, use: $newuser->sendEmail = true;');
+        $f->attr('checked', $data['automaticEmailSend'] ? 'checked' : '' );
+        $wrapper->add($f);
+
+        $f = wire('modules')->get("InputfieldText");
+        $f->attr('name', 'fromEmail');
+        $f->label = __('From email address');
+        $f->description = __('Email address that the email will come from.');
+        $f->notes = __("If set, this will initially be populated with the adminEmail address defined in your site's config.php file. If this field is blank, the email will not be sent.");
+        $f->value = $data['fromEmail'];
+        $wrapper->add($f);
+
+        $f = wire('modules')->get("InputfieldText");
+        $f->attr('name', 'subject');
+        $f->label = __('Email Subject');
+        $f->description = __('Subject text for the email');
+        $f->value = $data['subject'];
+        $wrapper->add($f);
+
+        $f = wire('modules')->get("InputfieldTextarea");
+        $f->attr('name', 'body');
+        $f->label = __('Email Body');
+        $f->description = __('Body text for the email');
+        $f->value = $data['body'];
+        $f->notes = __("Use: {name} and {pass}, or any other fields from the user template, eg. {first_name} in the text where you want them to appear in the email. eg:\n---------------------------------------------------------------------------------------\n\nWelcome {first_name} {last_name}\n\nPlease login in at: {adminUrl}\n\nUsername: {name}\nPassword: {pass}\n\nIf you have any questions, please email us at: {fromEmail}\n\n---------------------------------------------------------------------------------------\nPlease note that {adminUrl} and {fromEmail} are two special codes and not fields from the user template. These will return http://".wire('config')->httpHost.wire('config')->urls->admin." and {$data['fromEmail']}, respectively.\n\n");
+        $wrapper->add($f);
+
+        $f = wire('modules')->get("InputfieldCheckbox");
+        $f->attr('name', 'generatePassword');
+        $f->label = __('Generate Password');
+        $f->description = __('Whether to automatically generate a password for the user.');
+        $f->attr('checked', $data['generatePassword'] ? 'checked' : '' );
+        $f->columnWidth = 40;
+        $f->notes = __("An automatically generated password will be assigned to the user.\nIf you have included {pass} in the email body then it will be emailed to them. If not, the password will be displayed in the message bar at the top of the page after you save the user - be sure to note it somewhere.");
+        $wrapper->add($f);
+
+        $f = wire('modules')->get("InputfieldSelect");
+        $f->attr('name', 'passLength');
+        $f->label = __('Password Length');
+        $f->description = __('Number of characters in automatically generated password. Minimum of 6 characters is required by PW.');
+        $f->columnWidth = 20;
+        for($i=6;$i<16;$i++) $f->addOption($i,$i);
+        $f->showIf = "generatePassword=1";
+        $f->required = 1;
+        $f->requiredIf = "generatePassword=1";
+        $f->value = $data['passLength'];
+        $wrapper->add($f);
+
+        $f = wire('modules')->get("InputfieldCheckboxes");
+        $f->attr('name', 'availableSets');
+        $f->label = __('Character Sets');
+        $f->description = __('The character sets that can make up the password.');
+        $f->notes = __('You must check digits and at least one of the letter options.');
+        $f->columnWidth = 40;
+        $f->showIf = "generatePassword=1";
+        $f->addOption('l', 'Lowercase Letters (abcdefghjkmnpqrstuvwxyz)');
+        $f->addOption('u', 'Uppercase Letters (ABCDEFGHJKMNPQRSTUVWXYZ)');
+        $f->addOption('d', 'Digits (23456789)');
+        $f->addOption('s', 'Special Characters (!@#$%&*?)');
+        $f->value = $data['availableSets'];
+        $wrapper->add($f);
+
+        // test send option
+        if(wire('user')->email != '') {
+            $f = wire('modules')->get("InputfieldCheckbox");
+        }
+        else {
+            $f = wire('modules')->get("InputfieldMarkup");
+        }
+        $f->name = "test";
+        $f->label = __("Test Send");
+        if(wire('user')->email != '') {
+            $f->description = __('On settings submit, a test email will be sent to ' . wire('user')->email . ' with your account details.');
+        }
+        else {
+            $f->description = __('There is no email address associated with your user account. Please add one to your profile to be able to send a test message.');
+        }
+        $f->collapsed = Inputfield::collapsedBlank;
+        $wrapper->add($f);
+
+        return $wrapper;
+    }
+
+
+}

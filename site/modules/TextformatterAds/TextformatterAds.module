@@ -1,0 +1,60 @@
+<?php namespace ProcessWire;
+/**
+ * ProcessWire Video Embedding Textformatter
+ *
+ * Looks for Youtube or Vimeo URLs and automatically converts them to embeds
+ *
+ * Copyright (C) 2020 by Ryan Cramer 
+ * Licensed under MPL 2.0
+ * https://processwire.com
+ *
+ * @property int $maxWidth
+ * @property int $maxHeight
+ * @property int $responsive
+ *
+ */
+
+
+class TextformatterAds extends Textformatter implements ConfigurableModule {
+    
+	public static function getModuleInfo() {
+		return array(
+			'title' => __('Ads', __FILE__), 
+			'version' => 111, 
+			'summary' => __('Place add in middle of file', __FILE__),
+			'author' => 'Eduardo San Miguel',
+			'href' => ''
+		); 
+	}
+    
+    public function format(&$str){
+        //bd($str);
+        //$this->log->save('ads-formatter', $str);
+        $this->insertads_middle($str);
+    }
+	
+
+    public function mantisAd(){
+        $ad = "<div data-mantis-zone='article-middle'></div>";
+        //$this->log->save('ads-formatter', $ad);
+        return $ad;
+    }
+
+    public function insertads_middle(&$content){   
+        $content = explode("</p>", $content);
+        $paragraphAfter = floor(count($content) / 3); 
+        $new_content = '';
+        $out = "";
+        for ($i = 0; $i < count($content); $i++) {
+            $out .=  $content[$i] . "</p>";
+            if ($i == $paragraphAfter) {
+                $out .= $this->mantisAd();
+            }
+        }
+
+        $content = $out;
+        //return $out;
+    }
+
+}
+?>

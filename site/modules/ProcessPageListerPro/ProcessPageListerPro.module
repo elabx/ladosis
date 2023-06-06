@@ -1,0 +1,1510 @@
+<?php
+
+/**
+ * Page Lister Pro: Process
+ *     __    _      __           
+ *    / /   (_)____/ /____  _____
+ *   / /   / / ___/ __/ _ \/ ___/
+ *  / /___/ (__  ) /_/  __/ /    
+ * /_____/_/____/\__/\___/_/ PRO
+ *
+ * Provides an alternative listing view for pages using specific templates (Professional Version)
+ *
+ * This is a commercial module, please do not distribute. 
+ *
+ * ListerPro for ProcessWire
+ * Copyright 2016 by Ryan Cramer
+ * http://processwire.com/ListerPro/
+ *
+ * 
+ * @todo: add support for user-specific bookmarks (https://processwire.com/talk/topic/13117-request-add-permission-to-createedit-bookmarks/)
+ * @todo: allow for subfields of "modified user" and "created user"
+ * @todo: include=unpublished overrides status "does not have" unpublished
+ * @todo: allow for option of locking the field select boxes
+ * @todo: limitFields option is limiting all column fields, even config ones. 
+ * @todo: option to merge config and bookmarks per here https://processwire.com/talk/topic/10944-filters-reset-in-bookmarks/
+ * 
+ * @property array $editColumns Field IDs that are editable in the Lister
+ * @property array $editFieldtypes Fieldtype classnames allowed for editColumns
+ * @property int $editOption See editOption constants
+ * @property bool $editPreload Whether or not to preload editors in rendered table
+ * @property int|bool $useColumnLabels Whether or not to use column labels (vs. names)
+ * @property array $settings Where all Listers config data is stored
+ * @property array $allowActions Action class names that are allowed for this Lister
+ * @property array $limitFields Limit selectable fields to only those present here (names)
+ * @property array $toggles Toggles from ListerPro config $settings, specific to this Lister
+ * @property array $InputfieldSelectorSettings Settings to pass along to InputfieldSelector
+ * @property string $licenseKey
+ *
+ * 
+ */
+
+class ProcessPageListerPro extends ProcessPageLister implements ConfigurableModule, WirePageEditor {
+	
+	const editOptionNone = 0;
+	const editOptionSome = 1;
+	const editOptionAll = 2; 
+
+	/**
+	 * @var ListerProActions|null
+	 *
+	 */
+	protected $actions = null;
+
+	/**
+	 * For editable columns and WirePageEditor interface getPage() method
+	 * 
+	 * @var null|Page
+	 * 
+	 */
+	protected $editorPage = null;
+
+
+	/**
+	 * Parent class name either \\ProcessWire\\ProcessPageLister or just ProcessPageLister
+	 * 
+	 * @var string
+	 * 
+	 */
+	protected $parentClass; 
+
+	/**
+	 * Construct ListerPro
+	 *
+	 */
+	public function __construct() {
+
+		$url = $this->wire('config')->urls->ProcessPageLister; 
+		$this->wire('config')->styles->add($url . "ProcessPageLister.css"); 
+		$this->wire('config')->scripts->add($url . "ProcessPageLister.js"); 
+		$this->parentClass = "\\ProcessWire\\ProcessPageLister";
+		if(!class_exists($this->parentClass)) $this->parentClass = "ProcessPageLister";
+
+		parent::__construct();
+	
+		// the following will be overridden per ListerPro config
+		$this->set('useColumnLabels', 0);
+
+		// where all listers config data is stored
+		$this->set('settings', array()); 
+
+		// action class names that are allowed for this Lister
+		$this->set('allowActions', array());
+		
+		// IDs of fields that are allowed to be edited in the Lister
+		$this->set('editColumns', array());
+		
+		// If true, then all editable columns can be used (bypassing editColumns setting)
+		$this->set('editOption', self::editOptionNone); 
+		
+		// List of all Fieldtypes modules allowed for editable columns (empty=allow all)
+		$this->set('editFieldtypes', array());
+		
+		// If true, editors will always be rendered
+		$this->set('editPreload', false);
+
+		$this->set('limitFields', array());
+		$this->set('licenseKey', ''); 
+		$this->set('initSelector', ''); 
+		$this->set('toggles', array()); 
+		
+		$this->set('imageStyle', 0); // 0=image only, 1=detailed
+		
+		$dirname = dirname(__FILE__) . '/';
+		require_once($dirname . '/ListerProConfig.php'); 
+		require_once($dirname . '/ListerProActions.php'); 
+	}
+
+	/**
+	 * Initalize lister variables
+	 *
+	 */
+	public function init() {
+
+		$name = $this->page->name; 
+
+		$settings = $this->settings; 
+
+		if($settings && isset($settings[$name])) {
+			$settings = $settings[$name]; // convert to localized settings specific to this lister
+			$this->parent = empty($settings['parent']) || ((int) $settings['parent']) === 1 ? new NullPage() : $this->pages->get((int) $settings['parent']); 
+			if(isset($settings['defaultSort'])) $this->defaultSort = $settings['defaultSort']; 
+			if(isset($settings['columns'])) $this->columns = $settings['columns']; 
+			if(isset($settings['initSelector'])) $this->initSelector = $settings['initSelector']; 
+			if(isset($settings['defaultSelector'])) $this->defaultSelector = $settings['defaultSelector']; 
+			if(isset($settings['delimiters'])) $this->delimiters = $settings['delimiters']; 
+			if(isset($settings['allowActions'])) $this->allowActions = $settings['allowActions'];
+			if(isset($settings['limitFields'])) $this->limitFields = $settings['limitFields']; 
+			if(isset($settings['imageWidth'])) $this->imageWidth = (int) $settings['imageWidth'];
+			if(isset($settings['imageHeight'])) $this->imageHeight = (int) $settings['imageHeight'];
+			if(isset($settings['imageFirst'])) $this->imageFirst = $settings['imageFirst'];
+			if(isset($settings['imageStyle'])) $this->imageStyle = $settings['imageStyle'];
+			if(isset($settings['viewMode'])) $this->viewMode = (int) $settings['viewMode'];
+			if(isset($settings['editMode'])) $this->editMode = (int) $settings['editMode'];
+			if(isset($settings['toggles'])) $this->toggles = $settings['toggles'];
+			if(isset($settings['useColumnLabels'])) $this->useColumnLabels = (int) $settings['useColumnLabels'];
+			if(isset($settings['InputfieldSelectorSettings'])) $this->InputfieldSelectorSettings = $settings['InputfieldSelectorSettings'];
+			if(isset($settings['editOption'])) $this->editOption = $settings['editOption'];
+			if(isset($settings['editColumns'])) $this->editColumns = $settings['editColumns'];
+			if(isset($settings['editPreload'])) $this->editPreload = $settings['editPreload'];
+
+		} else if($this->input->urlSegment1 == 'config') { 
+			// defaults for unconfigured lister
+			if($name != 'lister') $this->initSelector = 'template='; 
+			$this->columns = $this->defaultColumns;
+			$this->parent = new NullPage();
+
+		} else {
+			// send them to configure this lister
+			// $this->session->redirect($this->page->url . 'config/'); 
+		}
+
+		if($this->isValid()) $this->actions = new ListerProActions($this); 
+		
+		$this->config->js($this->className(), array(
+			'closeLabel' => $this->_('Close'), 
+			'openNewLabel' => $this->_('Open in new window'),
+		));
+	
+		if(!$this->wire('config')->ajax) {
+			foreach($this->editColumns as $fieldID) {
+				if($fieldID == 'name') {
+					$inputfield = $this->wire('modules')->get('InputfieldPageName');
+				} else {
+					$field = $this->wire('fields')->get($fieldID);
+					if(!$field) continue; 
+					// load Inputfields now to pre-load of any needed css/js files
+					$inputfield = $field->getInputfield(new NullPage());
+				}
+				$inputfield->renderReady();
+				$inputfield->render();
+			}
+		} else if(isset($_SERVER['HTTP_X_FIELDNAME'])) {
+			// ajax file upload gets sent directly to ProcessPageEdit
+			$this->processAjaxUpload();
+		}
+
+		parent::init();
+	}
+	
+	protected function processAjaxUpload() {
+		if(!preg_match('/^(.+)_LPID(\d+)$/', $_SERVER['HTTP_X_FIELDNAME'], $matches)) return;
+		if(!$this->wire('user')->hasPermission('page-edit')) return;
+		$fieldName = $this->wire('sanitizer')->fieldName($matches[1]);
+		$_SERVER['HTTP_X_FIELDNAME'] = $fieldName;
+		$pageID = (int) $matches[2];
+		$_POST['id'] = $pageID;
+		$pageEdit = $this->wire('modules')->get('ProcessPageEdit');
+		ob_start();
+		$pageEdit->execute();
+		$out = ob_get_contents();
+		ob_end_clean();
+		// adjust returned markup for our LPID namespace
+		$out = str_replace("_{$fieldName}_", "_{$fieldName}_LPID{$pageID}_", $out);
+		echo $out;
+		exit;
+	}
+
+	/**
+	 * getModuleInfo interface for required permission
+	 * 
+	 * @param array $data
+	 * @return bool
+	 *
+	 */
+	public static function hasListerPermission(array $data) {
+
+		/** @var Page $page */
+		$page = $data['page'];
+		/** @var User $user */
+		$user = $data['user'];
+		$info = $data['info'];
+		$wire = $data['wire'];
+
+		$permission = $wire->permissions->get("page-lister-$page->name"); 
+		if(!$permission->id) $permission = 'page-lister';
+
+		return $user->hasPermission($permission); 
+	}
+
+	
+	/**
+	 * Get the InputfieldSelector instance for this Lister
+	 *
+	 * @return InputfieldSelector
+	 *
+	 */
+	public function getInputfieldSelector() {
+		$s = parent::getInputfieldSelector();
+		$s->allowSubfieldGroups = true; // we only support in ListerPro
+		$s->allowSubselectors = true; // we only support in ListerPro
+		if($this->allowSystem) {
+			$s->allowSystemCustomFields = true; 
+			$s->allowSystemTemplates = true; 
+		}
+		
+		if($this->InputfieldSelectorSettings) {
+			// populate user settings to InputfieldSelector
+			foreach(explode("\n", $this->InputfieldSelectorSettings) as $line) {
+				$line = trim($line); 
+				$pos = strpos($line, '='); 
+				if(!$pos) continue; 
+				$key = substr($line, 0, $pos); 
+				$value = substr($line, $pos+1); 
+				$s->$key = $value;
+
+				// we will re-use 'exclude' for 'disallowColumns' Lister config option
+				if($key == 'exclude') {
+					$this->disallowColumns = array_merge($this->disallowColumns, explode(',', str_replace(' ', '', $value))); 
+				}
+			}
+		}
+		
+		return $s; 
+	}
+	
+	public function ___execute() {
+
+		/*
+		// @todo section hook should be enabled only if sticky-header.js is loaded
+		if($this->get('responsiveTable') === null) {
+			$this->addHookBefore('MarkupAdminDataTable::render', function($event) {
+				$table = $event->object;
+				$table->setResponsive(false);
+			});
+		} else {
+			$this->set('responsiveTable', false);	
+		}
+		// @todo end
+		*/
+		
+		$out = parent::___execute();
+		$config = $this->wire('config');
+		
+		if(!$config->ajax) {
+			if(!method_exists($this->parentClass, 'prepareExternalAssets')) {
+				$this->prepareExternalAssets();
+			}
+		}
+		
+		return $out; 
+	}
+
+	/**
+	 * Find and render the results (ajax)
+	 *
+	 * This is only called if the request comes from ajax
+	 *
+	 * @param string|null $selector
+	 * @return string
+	 *
+	 */
+	protected function ___renderResults($selector = null) {
+		
+		$out = parent::___renderResults($selector);
+		
+		if($this->editOption != self::editOptionNone) {
+			$confirmText = $this->_('There are unsaved changes. If you proceed, you will lose these changes:');
+			$formClass = 
+				'Inputfield InputfieldWrapper InputfieldForm InputfieldFormConfirm ' . 
+				//'InputfieldFormNoWidths InputfieldFormNoHeights ' . 
+				'InputfieldFormNoDependencies InputfieldAllowAjaxUpload';
+			
+			if($this->editPreload) $formClass .= " ListerEditPreload";
+			
+			$out = 
+				"<form id='table_editable' action='./' method='post' class='$formClass' data-confirm='$confirmText'>" . 
+				//"<div class='Inputfields'>$out</div>" . 
+				$out . 
+				$this->wire('session')->CSRF->renderInput() . 
+				"</form>";
+		
+		}
+	
+		if($this->wire('config')->ajax) {
+			if(strpos($out, "<div id='ProcessListerScript'>") === false) {
+				$out .= $this->renderExternalAssets();
+			}
+		} else if(!method_exists($this->parentClass, 'prepareExternalAssets')) {
+			$this->prepareExternalAssets();
+		}
+		
+		return $out; 
+	}
+
+	/**
+	 * Prepare the session values for external assets, to be called during non-ajax request only
+	 * 
+	 * This method can be removed once this version of ListerPro is always used with PW 2.6.14+
+	 * as the method has been moved to the core ProcessPageLister.module file
+	 * 
+	 */
+	public function prepareExternalAssets() {
+		
+		$config = $this->wire('config');
+
+		/*
+		// @todo make these available as extras that can be enabled (or not) from config tab
+		$url = $config->urls->ProcessPageListerPro;
+		$config->scripts->add($url . 'extras/multi-row-select.js');
+		$config->scripts->add($url . 'extras/sticky-header.js');
+		$config->styles->add($url . 'extras/sticky-header.css');
+		*/
+		
+		if(method_exists($this->parentClass, "prepareExternalAssets")) {
+			parent::prepareExternalAssets();
+			return;
+		}
+		
+		$loadedFiles = array();
+		$loadedJSConfig = array();
+		$regex = '!(Inputfield|Fieldtype|Language|Process|Jquery|Markup)!';
+		foreach($config->scripts as $file) {
+			if(!preg_match($regex, $file)) continue;
+			$loadedFiles[] = $file;
+		}
+		foreach($config->styles as $file) {
+			if(!preg_match($regex, $file)) continue;
+			$loadedFiles[] = $file;
+		}
+		foreach($config->js() as $key => $value) {
+			$loadedJSConfig[] = $key;
+		}
+		$this->sessionSet('loadedFiles', $loadedFiles);
+		$this->sessionSet('loadedJSConfig', $loadedJSConfig);
+	}
+
+	/**
+	 * Return a markup string with scripts that load external assets for an ajax request
+	 * 
+	 * @return string
+	 * 
+	 */
+	public function renderExternalAssets() {
+		
+		if(method_exists($this->parentClass, 'renderExternalAssets')) {
+			return parent::renderExternalAssets();
+		}
+		
+		// all the following can be removed after this version of ListerPro is used with PW 2.6.14+
+		// because this method has been moved to the core ProcessPageLister.module file
+		
+		$script = '';
+		$regex = '!(Inputfield|Fieldtype|Language|Process|Jquery|Markup)!';
+		$scriptClose = '';
+		$loadedFiles = $this->sessionGet('loadedFiles');
+		if(is_null($loadedFiles)) $loadedFiles = array();
+		$loadedFilesAdd = array();
+		$loadedJSConfig = $this->sessionGet('loadedJSConfig');
+		$config = $this->wire('config');
+		$out = '';
+		
+		foreach($config->scripts as $file) {
+			if(strpos($file, 'ProcessPageLister')) continue;
+			if(!preg_match($regex, $file)) continue;
+			if(in_array($file, $loadedFiles)) {
+				// script was already loaded and can be skipped
+				// if($this->wire('config')->debug) $script .= "\nconsole.log('skip: $file');";
+			} else {
+				// new script that needs loading
+				//$script .= "\n<script src='$file'></script>";
+				if($script) $script .= "\n";
+				$script .= "$.getScript('$file', function(data, textStatus, jqxhr){";
+				// "console.log(textStatus); ";
+				$scriptClose .= "})";
+				$loadedFilesAdd[] = $file;
+			}
+		}
+		$script .= $scriptClose;
+
+		foreach($config->styles as $file) {
+			if(strpos($file, 'ProcessPageLister')) continue;
+			if(!preg_match($regex, $file)) continue;
+			if(!in_array($file, $loadedFiles)) {
+				$script .= "\n$('<link rel=\"stylesheet\" type=\"text/css\" href=\"$file\">').appendTo('head');"; // console.log('$file');</script>";
+				$loadedFilesAdd[] = $file;
+			}
+		}
+
+		if(count($loadedFilesAdd)) {
+			$loadedFiles = array_merge($loadedFiles, $loadedFilesAdd);
+			$this->sessionSet('loadedFiles', $loadedFiles);
+		}
+
+		$jsConfig = array();
+		foreach($this->wire('config')->js() as $property => $value) {
+			if(!in_array($property, $loadedJSConfig)) {
+				$loadedJSConfig[] = $property;
+				$jsConfig[$property] = $value;
+			}
+		}
+
+		if(count($jsConfig)) {
+			$script .= "\n\n" . 'var configAdd=';
+			$script .= json_encode($jsConfig) . ';';
+			$script .= "\n\n" . '$.extend(config, configAdd);';
+			//$script .= "console.log(configAdd);";
+			$this->sessionSet('loadedJSConfig', $loadedJSConfig);
+		}
+
+		$out .= "<div id='ProcessListerScript'>$script</div>";
+		
+		return $out; 
+	}
+
+	/**
+	 * Save editColumns
+	 * 
+	 * Looks for a $_POST['_changes'] var containing CSV list of changes in format: 
+	 * 123.456,123.456,123.456 where 123 is page ID and 456 is field ID and commas
+	 * separate each page.field combination.
+	 * 
+	 */
+	public function ___executeSave() {
+	
+		if($this->editOption == self::editOptionNone) return '';
+		$result = array('debug' => array());
+		$changes = $this->wire('input')->post('_changes');
+		if(empty($changes)) return $result;
+		$changes = array_unique(explode(',', $changes));
+		$pages = array();
+		$pagesChanges = array();
+		
+		foreach($changes as $change) {
+			
+			list($pageID, $fieldID) = explode('.', $change);
+			$pageID = (int) $pageID;
+			if(!$pageID) continue;
+			$page = isset($pages[$pageID]) ? $pages[$pageID] : $this->wire('pages')->get($pageID);
+			if(!$page->id || !$page->editable() || $page->isLocked()) continue;
+			if(!isset($pages[$pageID])) $pages[$pageID] = $page;
+			$suffix = $this->getInputfieldSuffix($page); 
+			$field = null;
+			
+			if($fieldID == 'name' || $fieldID == 'parent') {
+				$fieldName = $fieldID;
+			} else {
+				$fieldID = (int) $fieldID;
+				if(!$fieldID) continue;
+				$field = $this->wire('fields')->get($fieldID);
+				if(!$field) continue; 
+				$fieldName = $field->name;
+			}
+			
+			if(!$page->id || !$page->editable($fieldName)) continue;
+			if($this->editOption == self::editOptionSome && !in_array($fieldID, $this->editColumns)) continue;
+			if($page->isLocked()) continue;
+			
+			$page->of(false);
+			$this->editorPage = $page; 
+
+			$inputfield = null;
+			if($field) {
+				$inputfield = $field->getInputfield($page, $suffix);
+			} else if($fieldName == 'name') {
+				$inputfield = $this->getNameInputfield($page);
+			} else if($fieldName == 'parent') {
+				$inputfield = $this->getParentInputfield($page);
+			}
+			if(!$inputfield) continue;
+			
+			$value = $page->getUnformatted($fieldName);
+			if($fieldName == 'parent') $value = $value->id;
+			$inputfield->attr('value', $value);
+			$inputfield->resetTrackChanges(true);
+			$inputfield->processInput($this->wire('input')->post);
+
+			if(!isset($pagesChanges[$page->id])) $pagesChanges[$page->id] = array();
+			
+			if($inputfield->isChanged()) {
+				$valuePrevious = $value;
+				if(is_object($value) && $value instanceof LanguagesValueInterface) {
+					$value->setFromInputfield($inputfield);
+				} else if($fieldName == 'parent') {
+					$newParent = $this->wire('pages')->get((int) $inputfield->attr('value'));
+					if($newParent->id && $newParent->id != $value && $newParent->addable($page)) $value = $newParent;
+				} else {
+					$value = $inputfield->attr('value');
+				}
+				$result['debug'][] = "$fieldName=$value";
+				$page->set($fieldName, $value);
+				$page->trackChange($fieldName);
+				if($value instanceof WireArray) $value->trackChange('value');
+				$pagesChanges[$page->id][$fieldName] = $fieldName; 
+				/*
+				array(
+					// TMP: change back to just $fieldName after debugging
+					'old' => (string) $valuePrevious,
+					'new' => (string) $value,
+					'new2' => (string) $page->get($fieldName), 
+					'process' => (string) $this->wire('process')
+				);
+				*/
+			}
+		}
+	
+		// commit any temporary files to be permanent
+		foreach($pages as $page) {
+			/** @var Page $page */
+			$this->editorPage = $page;
+			foreach($page->template->fieldgroup as $f) {
+				if(!$f->type instanceof FieldtypeFile) continue;
+				$pagefiles = $page->get($f->name);	
+				foreach($pagefiles as $pagefile) {
+					/** @var Pagefile $pagefile */
+					if(!$pagefile->isTemp()) continue;
+					$pagefile->isTemp(false);
+					$pagesChanges[$page->id][$f->name] = $f->name;
+					$page->trackChange($f->name);
+				}
+				// if limited to 1 file, remove leading file(s) so that only the last remains
+				if($f->maxFiles == 1) while(count($pagefiles) > 1) {
+					$item = $pagefiles->first();
+					$pagefiles->remove($item);
+					$page->trackChange($f->name);
+					$pagesChanges[$page->id][$f->name] = $f->name;
+				}
+			}
+		}
+
+		$numErrors = 0;
+		$result['changes'] = $pagesChanges;
+		
+		foreach($pagesChanges as $pageID => $changes) {
+			$page = $pages[$pageID];
+			$this->editorPage = $page;
+			$numChanges = count($changes);
+			if(!$numChanges) continue;
+			if($numChanges == 1 && $this->wire('fields')->get(reset($changes))) {
+				reset($changes);
+				$change = key($changes);
+				if(!$this->wire('pages')->saveField($page, $change)) $numErrors++;
+			} else {
+				if(!$this->wire('pages')->save($page, array('uncacheAll' => false))) $numErrors++;
+			}
+		}
+		if($numErrors) {
+			$result['success'] = false;
+			$result['message'] = $this->wire('pages')->errors('all string');
+		} else {
+			$result['success'] = true;
+		}
+		
+		header("Content-type: application/json"); 
+		return json_encode($result);
+	}
+
+	public function renderExtras() {
+		$out = '';
+		if($this->actions) $out .= $this->actions->render();
+		if($this->wire('user')->isSuperuser() && $this->isValid()) {
+			$out .= "<div id='ProcessListerConfigTab' title='" . $this->_x('Config', 'tab') . "' class='WireTab'></div>";
+		}
+		$out .= parent::renderExtras();	
+		return $out; 
+	}
+
+	/**
+	 * Find what parent templates are active with the current init selectors
+	 *
+	 * @return array
+ 	 *
+	 */
+	public function findParentTemplates() {
+
+		static $cache = array();
+
+		// if a specific parent is defined, limit to that
+		if($this->parent && $this->parent->id) return array($this->parent->template); 
+
+		// if this method was previously called, return cached value
+		if(isset($cache[$this->initSelector])) return $cache[$this->initSelector]; 
+
+		$parentTemplates = array();
+		$pageTemplates = $this->getSelectorTemplates($this->initSelector, true); 
+		if(!count($pageTemplates)) {
+			$cache[$this->initSelector] = $parentTemplates;
+			return $parentTemplates; 
+		}
+		$allTemplates = $this->wire('templates');
+
+		// first determine parent templates from family 'parentTemplates' settings
+		foreach($pageTemplates as $key => $template) {
+			if(empty($template->parentTemplates)) continue;
+			foreach($template->parentTemplates as $id) {
+				$id = (int) $id; 
+				if(isset($parentTemplates[$id])) continue; 
+				$template = $allTemplates->get($id);
+				if($template) $parentTemplates[$id] = $template;
+			}
+			unset($pageTemplates[$key]); 	
+		}
+
+		// next determine parent templates from family 'childTemplates' settings
+		if(count($pageTemplates)) foreach($allTemplates as $template) {
+			if(empty($template->childTemplates)) continue; 		
+			foreach($pageTemplates as $key => $pageTemplate) {
+				if(!in_array($pageTemplate->id, $template->childTemplates)) continue; 
+				$parentTemplates[$template->id] = $template; 
+				unset($pageTemplates[$key]); 	
+			}
+		}
+
+		// if we have anything leftover, determine it from existing data in the DB
+		foreach($pageTemplates as $template) {
+
+			$sql = 	
+				'SELECT parents.templates_id FROM pages ' . 
+				'JOIN pages AS parents ON parents.id=pages.parent_id ' . 
+				'WHERE pages.templates_id=:templateID ' . 
+				'AND pages.status<=:pageStatus ' . 
+				'AND parents.status<=:parentStatus ' . 
+				'GROUP BY parents.templates_id LIMIT 100';
+
+			$query = $this->wire('database')->prepare($sql); 
+			$query->bindValue(':templateID', $template->id, PDO::PARAM_INT); 
+			$query->bindValue(':pageStatus', Page::statusUnpublished, PDO::PARAM_INT); 
+			$query->bindValue(':parentStatus', Page::statusUnpublished, PDO::PARAM_INT); 
+			$query->execute();
+
+			while($row = $query->fetch(PDO::FETCH_NUM)) {
+				list($id) = $row; 
+				$id = (int) $id; 
+				if(isset($parentTemplates[$id])) continue; 
+				$template = $allTemplates->get($id); 
+				if($template) $parentTemplates[$id] = $template;
+			}
+		}
+
+		$cache[$this->initSelector] = $parentTemplates; 
+
+		return $parentTemplates; 
+	}
+
+	/**
+	 * Build the Lister filters form
+	 *
+	 * @return InputfieldForm
+	 *
+	 */
+	protected function buildFiltersForm() {
+		$form = parent::buildFiltersForm();
+		/** @var InputfieldSelector $f */
+		$f = $form->getChildByName('filters'); 
+		if(in_array('collapseFilters', $this->toggles)) $f->collapsed = Inputfield::collapsedYes; 
+		if(in_array('noNewFilters', $this->toggles)) $f->allowAddRemove = false;
+		$f->showFieldLabels = (int) $this->useColumnLabels;
+		return $form; 
+	}
+
+	/**
+	 * Build the columns asmSelect
+	 *
+	 */
+	public function buildColumnsField() {
+
+		$fields = $this->template ? $this->template->fieldgroup : $this->wire('fields'); 
+		/** @var InputfieldAsmSelect $f */	
+		$f = parent::buildColumnsField();
+		if(!$this->isValid()) return $f; 
+
+		$nullPage = new NullPage();
+		$options2 = array();
+		$systemColumns = $this->getSystemColumns();
+		$systemLabels = $this->systemLabels;
+		$useLabels = (bool) $this->useColumnLabels;
+		$parentLabel = $this->_('Parent'); 
+		$limitFields = count($this->limitFields) ? $this->limitFields : null;
+		
+		// specific to the parent.[subfield] properties
+		foreach($systemColumns as $name) {
+			$value = "parent.$name";
+			if($limitFields && !in_array($value, $limitFields)) continue;
+			$label = isset($systemLabels[$name]) ? $systemLabels[$name] : $name;
+			$label = $parentLabel . ' > ' . $label;
+			$options2[$value] = $label;
+		}
+
+		$parentTemplates = $this->findParentTemplates();
+		foreach($parentTemplates as $template) {
+			foreach($template->fieldgroup as $field) {
+				/** @var Field $field */
+				if(count($parentTemplates) == 1) {
+					$_field = $template->fieldgroup->getField($field->name, true); // get in context
+					if($_field) $field = $_field; 
+				}
+				$value = "parent.$field->name";
+				if($limitFields && !in_array($value, $limitFields)) continue; 
+				$label = $parentLabel . ' > ' . $field->getLabel();
+				$options2[$value] = $label;
+			}
+		}	
+
+		$initTemplate = $this->template;	
+
+		// all other fields	
+		foreach($fields as $field) {
+
+			if(!$this->allowColumnField($field)) continue; 
+
+			if($initTemplate) {
+				$_field = $initTemplate->fieldgroup->getField($field->name, true); // context
+				if($_field) $field = $_field; 
+			}
+
+			$info = $field->type->getSelectorInfo($field); 
+
+			if(count($info['subfields'])) {
+				foreach($info['subfields'] as $name => $subinfo) {
+					$value = "$field->name.$name";
+					$label = $field->getLabel() . ' > '; 
+					if(isset($systemLabels[$name])) {
+						$label .= $systemLabels[$name]; 
+					} else {
+						$_f = $this->wire('fields')->get($name); 
+						if($_f) {
+							$label .= $_f->getLabel();
+						} else {
+							$label .= $name;
+						}
+					}
+					
+					$options2[$value] = $label;
+				}
+
+				$blankValue = $field->type->getBlankValue($nullPage, $field);
+				if($blankValue instanceof Page || $blankValue instanceof PageArray) {	
+					foreach($systemColumns as $name) {
+						$label = $field->getLabel() . ' > ';
+						$label .= isset($systemLabels[$name]) ? $systemLabels[$name] : $name; 
+						$options2["$field->name.$name"] = $label;
+					}
+				}
+			}
+		}
+
+		ksort($options2); 
+		foreach($options2 as $value => $label) {
+			if($useLabels) $f->addOption($value, $label, array('data-desc' => $value)); 
+				else $f->addOption($value, $value, array('data-desc' => $label)); 
+		}
+		$f->attr('value', $this->columns); 
+		
+		if(in_array('collapseColumns', $this->toggles)) $f->collapsed = Inputfield::collapsedYes; 
+			
+		return $f; 
+	}
+	
+	public function renderButtons() {
+		$out = parent::renderButtons();
+		if($this->editOption != self::editOptionNone) {
+			if($out) $out .= "&nbsp;";
+			$btn = $this->wire('modules')->get('InputfieldButton');
+			$btn->attr('id', 'save_edits');
+			$btn->attr('value', $this->_('Save Edits'));
+			$btn->addClass('save_edits head_button_clone');
+			$btn->icon = 'save';
+			$out .= $btn->render();
+		}
+		return $out; 
+	}
+
+	/**
+	 * Build the Lister table column from a Page and column name
+	 *
+	 * @param Page $p
+	 * @param array $fields
+	 * @param string $name
+	 * @param mixed $value
+	 * @return string
+	 *
+	 */
+	protected function buildListerTableCol(Page $p, array $fields, $name, $value = null) {
+	
+		// whether or not to render the editor output in this request
+		if($this->editPreload) {
+			$getEditor = true;
+		} else {
+			static $getEditor = null;
+			if(is_null($getEditor)) $getEditor = (int) $this->wire('input')->post('editor');
+		}
+
+		if(strpos($name, '.') !== false) {
+			list($basename, $subname) = explode('.', $name);
+			if($subname == 'data') $subname = '';
+		} else {
+			$basename = $name;
+			$subname = '';
+		}
+
+		if(is_null($value)) $value = $p->getUnformatted($basename);
+
+		if($value instanceof Pageimages && $this->imageStyle == 0 && !$subname) {
+			// this block can be removed when this version of LP requires PW 2.7+
+			$value = $value->getArray();
+			if($this->imageFirst && count($value) > 1) $value = array_slice($value, 0, 1);
+		}
+		
+		$colPreview = parent::buildListerTableCol($p, $fields, $name, $value);
+		if($this->editOption == self::editOptionNone) return $colPreview;
+		if($this->editOption == self::editOptionSome && !count($this->editColumns)) return $colPreview;
+		$tryEditor = true;
+		
+		if(!strlen($colPreview)) {
+			$field = $this->wire('fields')->get($name);
+			$colPreview .= "<span class='ui-priority-secondary detail'>";
+			if($field && !$p->template->fieldgroup->hasField($field)) {
+				$colPreview .= $this->_('N/A', 'na-col-preview'); // Field is not applicable to page
+				$tryEditor = false;
+			} else {
+				$colPreview .= $this->_x('Blank', 'blank-col-preview'); // Field is blank on page
+			}
+			$colPreview .= "</span>";
+		}
+		
+		if($p->isLocked()) $tryEditor = false;
+		if(!$tryEditor) return $colPreview;
+		
+		if($getEditor) {
+			$colEditor = $this->buildListerTableColEditor($p, $fields, $name, $value);
+		} else {
+			$colEditor = "<div class='col_editor col_editor_inactive'></div>";
+		}
+		if(!strlen($colEditor)) return $colPreview;
+
+		$out = 
+			"<div class='col_editable'>" . 
+				"<div class='col_preview'>$colPreview</div>" . 
+				"$colEditor" . 
+			"</div>";
+
+		return $out;
+	}
+	
+	/**
+	 * Build the Lister table column editor
+	 *
+	 * @param Page $p
+	 * @param array $fields
+	 * @param string $name
+	 * @param mixed $value
+	 * @return string Returns blank string when editor not available
+	 *
+	 */
+	protected function buildListerTableColEditor(Page $p, array $fields, $name, $value) {
+
+		/** @var Inputfield $inputfield */
+		$inputfield = null;
+		$field = null;
+		$suffix = $this->getInputfieldSuffix($p);
+	
+		if($name == 'name') {
+			$inputfield = $this->getNameInputfield($p);
+			if(!$inputfield) return '';
+			$fieldID = 'name';
+			
+		} else if($name == 'parent') {
+			$inputfield = $this->getParentInputfield($p);
+			if(!$inputfield) return '';
+			$fieldID = 'parent';
+			
+		} else {
+			$field = isset($fields[$name]) ? $fields[$name] : $this->wire('fields')->get($name);
+			if(!$p->editable($name)) return '';
+			$fieldID = $field ? $field->id : '';
+			if(!$inputfield && empty($field)) return '';
+			if($field && $this->editOption == self::editOptionSome && !in_array($field->id, $this->editColumns)) return '';
+			if($field && count($this->editFieldtypes) && !in_array($field->type->className(), $this->editFieldtypes)) return '';
+		}
+	
+		$this->editorPage = $p;
+		if(is_null($value)) $value = $p->getUnformatted($name);
+		if(!$inputfield && $field) $inputfield = $field->getInputfield($p, $suffix);
+		if(!$inputfield) return '';
+		
+		$inputfield->attr('value', $value);
+		$inClass = $inputfield->className();
+		$header = '';
+		$outReplacements = array(); // text replacements in rendered markup, when applicable
+	
+		// i.e. InputfieldCheckboxes, InputfieldRadios: not enough room for option columns in Lister table
+		/** @var InputfieldCheckboxes|InputfieldRadios $inputfield */
+		if($inputfield->optionColumns) {
+			$inputfield->optionColumns = 0;
+		}
+
+		if($inClass == 'InputfieldPage') {
+			/** @var InputfieldPage $inputfield */
+			// special handling for Page fields using a findPagesSelector
+			$findPagesSelector = $field->findPagesSelector;
+			if($findPagesSelector && strpos($findPagesSelector, '=page.') !== false) {
+				if(preg_match('!([^,\s=]+)\s*=\s*page\.([^,\s]+)[,\s]*!', $findPagesSelector, $matches)) {
+					$f = $this->wire('fields')->get($matches[2]);
+					if($f) {
+						if(!in_array($f->name, $this->columns) || !in_array($f->id, $this->editColumns)) {
+							// remove the dependency requirement if dependency field isn't present and editable in the columns
+							$inputfield->findPagesSelector = str_replace($matches[0], '', $findPagesSelector);
+						} else {
+							$outReplacements['!' . $matches[1] . '=\s*page.' . $f->name . '\b!'] = "$matches[1]$suffix=page.{$f->name}$suffix";
+						}
+					}
+				}
+			}
+
+		} else if($inClass == 'InputfieldCKEditor') {
+			/** @var InputfieldCKEditor $inputfield */
+			$inputfield->configName = 'InputfieldCKEditor_' . $field->name;
+			
+		} else if($inputfield instanceof InputfieldItemList) {
+			$inClass .= ' InputfieldItemList';
+			$header = "<div class='InputfieldHeader'>$inputfield->label</div>";
+		}
+
+		if($field && $field->type instanceof FieldtypeImage) {
+			/** @var InputfieldImage $inputfield */
+			$inputfield->useImageEditor = false;
+		}
+		
+		// render the Inputfield
+		$inputfield->renderReady();
+		$label = $this->wire('sanitizer')->entities1($inputfield->label);
+		$desc = $field ? $field->getDescription(null, $p) : '';
+		$desc = $desc ? "<p class='description'>" . $this->wire('sanitizer')->entities($desc) . '</p>' : '';
+		$notes = $field ? $field->getNotes(null, $p) : '';
+		$notes = $notes ? "<p class='notes'>" . $this->wire('sanitizer')->entities($notes) . '</p>' : '';
+		$out = $inputfield->render();
+		$inClass = trim("$inClass Inputfield_$name $inputfield->wrapClass"); 
+	
+		// apply any applicable text replacements
+		foreach($outReplacements as $find => $replace) {
+			if(strpos($find, '!') === 0) {
+				$out = preg_replace($find, $replace, $out); // regex
+			} else {
+				$out = str_replace($find, $replace, $out); // regular
+			}
+		}
+		
+		// return rendered Inputfield markup
+		return	"<ul class='Inputfields'><li " .
+				"id='wrap_Inputfield_$inputfield->name' " . 
+				"class='col_editor Inputfield $inClass' " .
+				"data-pid='$p->id' " . 
+				"data-fid='$fieldID' " . 
+				"data-label='$label'>" . 
+					$header . 
+					"<div class='InputfieldContent'>$desc$out$notes</div>" . 
+				"</li></ul>";
+	}
+
+	/**
+	 * Get the ListerPro specific suffix to use for an Inputfield for a given Page
+	 * 
+	 * @param Page $p
+	 * @return string
+	 * 
+	 */
+	protected function getInputfieldSuffix(Page $p) {
+		return "_LPID$p->id";
+	}
+
+	/**
+	 * Get the Inputfield module to edit the 'name' property of a Page
+	 * 
+	 * @param Page $p
+	 * @return null|Inputfield
+	 * 
+	 */
+	protected function getNameInputfield(Page $p) {
+		
+		if($this->editOption == self::editOptionSome && !in_array('name', $this->editColumns)) return null;
+		if(!$p->editable('name')) return null;
+		$suffix = $this->getInputfieldSuffix($p);
+		
+		$inputfield = $this->wire('modules')->get('InputfieldPageName');
+		$inputfield->attr('id+name', "name" . $suffix . '__');
+		$inputfield->required = $p->id != 1;
+		$inputfield->slashUrls = $p->template->slashUrls;
+		$inputfield->checkboxSuffix = $suffix;
+		$inputfield->parentPage = $p->parent;
+		
+		return $inputfield;
+	}
+
+	/**
+	 * Get the Inputfield module to edit the 'parent' property of a Page
+	 * 
+	 * @param Page $p
+	 * @param int $maxParents
+	 * @return null|Inputfield
+	 * 
+	 */
+	protected function getParentInputfield(Page $p, $maxParents = 100) {
+		
+		if($p->id == 1) return null;
+		if($this->editOption == self::editOptionSome && !in_array('parent', $this->editColumns)) return null;
+		if(!$p->editable('parent')) return null;
+		
+		$parents = $this->getAllowedParents($p, $maxParents);
+		
+		if($parents->count()) {
+			// limited number of parents available, so we can use a regular select
+			$inputfield = $this->wire('modules')->get('InputfieldSelect');
+			foreach($parents as $parent) $inputfield->addOption($parent->id, $parent->get('title|name'));
+			$inputfield->attr('value', $p->parent->id);
+		} else {
+			// large quantity of parents available, so use a PageListSelect
+			$inputfield = $this->wire('modules')->get('InputfieldPageListSelect');
+			$inputfield->attr('value', $p->parent);
+		}
+		
+		$inputfield->label = $this->_('Parent');
+		$inputfield->attr('id+name', 'parent' . $this->getInputfieldSuffix($p));
+		$inputfield->required = true; 
+		
+		return $inputfield;
+	}
+
+	/**
+	 * Return the parent pages allowed for given $page
+	 * 
+	 * If there are too many possibilities, an empty PageArray is returned. 
+	 * 
+	 * @param Page $page
+	 * @param int $maxParents Maximum number of parents you will accept
+	 * @return PageArray
+	 * 
+	 */
+	protected function getAllowedParents(Page $page, $maxParents = 100) {
+		
+		$template = $page->template;
+		$parents = new PageArray();
+		$parents->add($page->parent);
+
+		// if page isn't allowed to be moved, then just return current parent
+		if($template->noMove) return $parents;
+	
+		// if user doesn't have permission to move pages then only return current parent
+		if(!$this->wire('user')->hasPermission('page-move', $page)) return $parents;
+
+		/** @var Templates $templates */
+		$templates = $this->wire('templates');
+		$parentTemplates = array();
+
+		// this section populates the parentTemplates array
+		if(count($template->parentTemplates)) {
+			
+			// page has specific parent templates that are allowed
+			foreach($template->parentTemplates as $tid) {
+				$tid = (int) $tid; 
+				$t = $templates->get($tid);
+				if(!$t) continue;
+				// verify that parent template also accepts our $page as a child
+				if(count($t->childTemplates) && !in_array($template->id, $t->childTemplates)) continue;
+				$parentTemplates[$tid] = $tid;
+			}
+		
+			// there are specified parent templates, but none resolved, so just return current parent
+			if(!count($parentTemplates)) return $parents;
+			
+		} else {
+			
+			// no parent templates specified, iterate all templates to see if any specify page's template as allowed for children
+			foreach($templates as $t) {
+				if(!count($t->childTemplates)) continue;
+				if(!in_array($template->id, $t->childTemplates)) continue;
+				$parentTemplates[$t->id] = $t->id;
+			}
+		}
+
+		if(!count($parentTemplates)) {
+			// anything may be possible, so return blank PageArray
+			return new PageArray();
+		}
+	
+		// determine how many possible parents there are
+		$selector = "include=all, template=" . implode('|', $parentTemplates); 
+		$qty = $this->wire('pages')->count($selector);
+		if($qty > $maxParents) return new PageArray(); // too many possibilities
+		
+		$parents = $this->wire('pages')->find("$selector, sort=title, sort=name");
+		$hasCurrent = false;
+		
+		foreach($parents as $parent) {
+			// check if parent is the same one we currently have, then it's always allowed
+			if($parent->id == $page->parent->id) {
+				$hasCurrent = true; 
+				continue;
+			}
+			// double check: if user isn't allowed to add this $page to this parent, remove it
+			if(!$parent->addable($page)) $parents->remove($parent);
+		}
+	
+		if(!$hasCurrent) $parents->prepend($page->parent);
+		
+		return $parents; 
+	}
+	
+	public function getPage() {
+		return $this->editorPage ? $this->editorPage : new NullPage(); 	
+	}
+	
+	/**
+	 * Execute Page Actions
+	 *
+	 */
+	public function ___executeActions() {
+		if(!$this->isValid()) return 'Product key required';
+		return $this->actions->execute(); 
+	}
+
+	/**
+	 * Execute individual Lister config
+	 *
+	 */
+	public function ___executeConfig() {
+		if(!$this->wire('user')->isSuperuser()) throw new WireException('This feature is only available to superuser.'); 
+		if(!$this->isValid()) return '';
+		$this->wire('breadcrumbs')->add(new Breadcrumb('../', $this->page->title)); 
+		$this->wire('processHeadline', $this->_('Configure Lister')); 
+		$listerConfig = new ListerProConfig($this); 
+		return $listerConfig->buildForm()->render();
+	}
+
+	public function isValid() { 
+		if(strpos($this->licenseKey, 'PWLP') === 0) return true; 
+		$this->error("Please provide a valid product key in the ListerPro module settings"); 
+		return false;
+	}
+	
+	public function getListerPageByID($id) {
+		$moduleID = $this->wire('modules')->getModuleID($this);
+		return $this->wire('pages')->get("process=$moduleID, template=admin, id=" . (int) $id); 
+	}
+	
+	public function getAllListerPages() {
+		$moduleID = $this->wire('modules')->getModuleID($this);
+		return $this->wire('pages')->find("process=$moduleID, template=admin, sort=created, include=hidden"); 
+	}
+
+	/**
+	 * ListerPro Module Configuration Screen
+	 * 
+	 * @param array $data
+	 * @return InputfieldWrapper
+	 *
+	 */
+	public static function getModuleConfigInputfields(array $data) {
+		
+		$form = new InputfieldWrapper();
+		/** @var InputfieldText $f */
+		$f = wire('modules')->get('InputfieldText');
+		$f->attr('id+name', 'licenseKey');
+
+		$licenseKey = isset($data['licenseKey']) ? $data['licenseKey'] : '';
+
+		if(wire('input')->post->licenseKey && wire('input')->post->licenseKey != wire('session')->ListerLicenseKey) {
+			// validate 
+			$http = new WireHttp();
+			$license = wire('sanitizer')->text(wire('input')->post->licenseKey);
+			$data = array(
+				'action' => 'validate',
+				'license' => $license,
+				'host' => wire('config')->httpHost, 
+				'ip' => ip2long(wire('session')->getIP())
+				);
+			$result = $http->post('http://processwire.com/validate-product/', $data); 
+
+			if($result === 'valid') {
+				$licenseKey = $license;
+				$f->notes = "Validated!";
+				wire()->message("ListerPro product key has been validated!");
+
+			} else {
+				$licenseKey = '';
+				$error = "Unable to validate product key: $result";
+				$f->error($error);		
+				wire()->error($error);		
+			}
+		}
+
+		if(empty($licenseKey)) wire('input')->post->__unset('licenseKey');
+
+		$f->attr('value', $licenseKey);
+		$f->required = true;
+		$f->label = "Product Key";
+		if($licenseKey) $f->label .= " - VALIDATED!";
+		$f->attr('value', wire('config')->demo ? 'disabled for demo mode' : $licenseKey);
+		$f->icon = $licenseKey ? 'check-square-o' : 'question-circle'; 
+		$f->description = "Paste in your ListerPro product support key.";
+		$f->notes = "If you did not purchase the ListerPro for this site, please [purchase a product key here](http://processwire.com/ListerPro/).";
+		if($licenseKey) $f->collapsed = Inputfield::collapsedYes; 
+		$form->add($f);
+
+		wire('session')->set('ListerLicenseKey', $licenseKey);
+		
+		/** @var InputfieldAsmSelect $f */
+		$f = wire('modules')->get('InputfieldAsmSelect');
+		$f->attr('name', 'editFieldtypes');
+		$f->label = __('Fieldtypes allowed for column editing in ListerPro');
+		$f->collapsed = Inputfield::collapsedYes; 
+		$f->icon = 'pencil';
+		$defaultSelected = array();
+		$skipDefaults = array('FieldtypePassword', 'FieldtypeRepeater', 'FieldtypePageTable');
+		foreach(wire('fieldtypes') as $fieldtype) {
+			/** @var Fieldtype $fieldtype */
+			$className = $fieldtype->className();
+			if(strpos($className, 'FieldtypeFieldset') !== false) continue;
+			$info = wire('modules')->getModuleInfoVerbose($fieldtype);
+			if(!empty($info['core']) && !in_array($className, $skipDefaults)) $defaultSelected[] = $className;
+			$f->addOption($className, $info['title']);
+		}
+		if(empty($data['editFieldtypes'])) {
+			$f->attr('value', $defaultSelected);
+		} else {
+			$f->attr('value', $data['editFieldtypes']);
+		}
+		$form->add($f);
+		
+		if($licenseKey) {
+		
+			/** @var ProcessPageListerPro $listerPro */
+			$listerPro = wire('modules')->get('ProcessPageListerPro'); 
+			$pagesWithListers = $listerPro->getAllListerPages();
+			if(wire('input')->post('licenseKey')) {
+				wire('modules')->addHookAfter('saveModuleConfigData', $listerPro, 'processConfigActions'); 
+			}
+			
+			// input to add new lister
+			$f = wire('modules')->get('InputfieldText');
+			$f->attr('id+name', '_new_lister_title');
+			$f->label = __('Add a Lister');
+			$f->icon = 'plus-circle';
+			$f->description = __('Enter the title for the lister you want to create. A new page containing your Lister will be created in your admin Pages navigation. You may move the page elsewhere if you prefer.'); // Add new Lister description
+			$form->add($f);
+
+			// input to clone existing lister
+			if(count($pagesWithListers)) {
+				$f = wire('modules')->get('InputfieldSelect');
+				$f->attr('name', '_clone_lister');
+				$f->label = __('Clone a Lister');
+				$f->description = __('To clone a Lister, select the Lister you want to clone here and enter the title of the new Lister in the "Add a Lister" field above.');
+				$f->icon = 'copy';
+				$f->attr('onchange', "if($(this).val().length) $('#_new_lister_title').focus()");
+				$f->collapsed = Inputfield::collapsedYes;
+				foreach($pagesWithListers as $p) {
+					$f->addOption($p->id, $p->title);
+				}
+				$form->add($f);
+			}
+		
+			// show all EXISTING listers
+			if(count($pagesWithListers)) {
+				$f = wire('modules')->get('InputfieldMarkup');
+				$f->attr('name', '_lister_list');
+				$f->label = __('Your Listers');
+				/** @var MarkupAdminDataTable $table */
+				$table = wire('modules')->get('MarkupAdminDataTable'); 
+				$table->setEncodeEntities(false);
+				$table->headerRow(array(
+					__('Lister Title'), 
+					__('Created'), 
+					__('Actions'),
+					'&nbsp;', 
+				));
+				foreach($pagesWithListers as $p) {
+					$table->row(array(
+						"<a href='$p->url'>$p->title</a>", 
+						"<span style='white-space:nowrap;'>" . date(wire('config')->dateFormat, $p->created) . "</span>", 
+						"<a href='{$p->url}config/'>" . __('configure') . "</a>",
+						"<label style='float: right;'>" . 
+							"<input type='checkbox' onclick='$(\"#delete_confirm\").show()' name='_delete_lister[]' value='$p->id' />&nbsp;" . 
+							"<i class='fa fa-trash-o'></i>" . 
+						"</label>"
+					));
+				}
+				$f->value = $table->render() . 
+					"<p id='delete_confirm' style='display: none; margin-top: -1em;'>" . 
+						"<strong>" . 
+						__('Are you sure you want to delete the checked Lister(s) above?') . 
+						"</strong><br />" . 
+						__('Check this box to confirm:') . ' ' . 
+						"<label style='display:inline;'><input type='checkbox' name='_delete_confirm' value='1' />&nbsp;" . 
+						"<i class='fa fa-trash-o'></i></label>" . 
+					"</p>";
+				$form->add($f); 
+			}
+		
+		}
+		return $form;
+	}
+	
+	public function processConfigActions(HookEvent $e) {
+		
+		static $level = 0;
+		$level++;
+		if($level > 1) return;
+
+		// check for NEW listers
+		$title = wire('input')->post('_new_lister_title');
+		if($title) {
+			$cloneID = wire('input')->post('_clone_lister');
+			if($cloneID) {
+				$clonePage = $this->getListerPageByID($cloneID);
+				if($clonePage->id) {
+					$this->cloneLister($clonePage, $title);
+				}
+			} else {
+				$this->addNewLister($title);
+			}
+		}
+
+		// check for DELETED Listers	
+		$deleteIDs = wire('input')->post('_delete_lister');
+		if(count($deleteIDs)) {
+			if(wire('input')->post('_delete_confirm')) {
+				foreach($deleteIDs as $pageID) {
+					$deletePage = $this->getListerPageByID($pageID);
+					if($deletePage->id) $this->deleteLister($deletePage);
+				}
+			} else {
+				$this->error(__('Delete was not confirmed'));
+			}
+		}
+	}
+
+	/**
+	 * Placeholder for the viewport iframe
+	 *
+	 * @param bool $exit If true, execution will stop after this method call.
+	 *
+	 */
+	public function executeViewport($exit = true) {
+		echo "<pre>
+    __    _      __           
+   / /   (_)____/ /____  _____
+  / /   / / ___/ __/ _ \/ ___/
+ / /___/ (__  ) /_/  __/ /    
+/_____/_/____/\__/\___/_/ PRO  
+		\n";
+		if($exit) exit; 
+	}
+
+	/**
+	 * Create a new Lister
+	 *
+	 * @param string $title Title of Lister to create
+	 * @return Page Returns the page where the new Lister resides or NullPage on failure
+	 *
+	 */
+	public function addNewLister($title) {
+		$page = new Page();
+		$page->template = 'admin';
+		$admin = $this->wire('pages')->get($this->wire('config')->adminRootPageID);
+		$parent = $admin->child('name=page, include=all');
+		$page->parent = $parent->id ? $parent : $admin;
+		$page->process = $this->wire('modules')->get('ProcessPageListerPro');
+		$page->title = $title;
+		try {
+			$page->save();
+			$this->message($this->_('Created Lister') . ' - ' . $page->title); 
+		} catch(Exception $e) {
+			$this->error("Error creating lister - " . $e->getMessage());
+			$page = new NullPage();
+		}
+		return $page;
+	}
+
+	/**
+	 * Clone the Lister living on $page to a new lister titled $newListerTitle
+	 * 
+	 * @param Page $page
+	 * @param $newListerTitle
+	 * @return Page Returns the new Lister page
+	 * 
+	 */
+	public function cloneLister(Page $page, $newListerTitle) {
+		$newPage = $this->addNewLister($newListerTitle); 
+		if(!$newPage->id) return $newPage; // NullPage
+		if($newPage->parent_id != $page->parent_id) {
+			$newPage->parent = $page->parent; 
+			$newPage->save();
+		}
+		$configData = $this->wire('modules')->getModuleConfigData($this);
+		$settings = isset($configData['settings'][$page->name]) ? $configData['settings'][$page->name] : array();
+		$settings['pagename'] = $newPage->name; 
+		$configData['settings'][$newPage->name] = $settings;
+		$this->wire('modules')->saveModuleConfigData($this, $configData);
+		$this->message(sprintf($this->_('Cloned Lister: %1$s => %2$s'), $page->name, $newPage->name));
+		return $newPage; 
+	}
+
+	/**
+	 * Delete the Lister that exists on the given Page
+	 * 
+	 * Also deletes the page. 
+	 * 
+	 * @param Page $page
+	 * @return bool Returns true on success, false on fail.
+	 * 
+	 */
+	public function deleteLister(Page $page) {
+		$configData = $this->wire('modules')->getModuleConfigData($this);
+		if(isset($configData['settings'][$page->name])) {
+			unset($configData['settings'][$page->name]);
+			$this->wire('modules')->saveModuleConfigData($this, $configData);
+		}
+		$className = $this->className();
+		if(((string) $page->getUnformatted('process')) == $className) {
+			$this->wire('pages')->delete($page); 	
+			$this->message(sprintf($this->_('Deleted Lister at %s'), $page->path)); 
+			return true; 
+		} else {
+			$this->error(sprintf($this->_('Page %1$s does not appear to be a %2$s'), $page->path, $className));
+			return false;
+		}
+	}
+
+	/**
+	 * Install ListerPro: Convert existing pages using Lister to use ListerPro
+	 *
+	 */
+	public function ___install() {
+
+		$data = $this->wire('modules')->getModuleConfigData('ProcessPageLister'); 
+		if(!empty($data)) $this->wire('modules')->saveModuleConfigData('ProcessPageListerPro', $data); 
+
+		$moduleID = $this->wire('modules')->getModuleID('ProcessPageLister'); 
+		if(!$moduleID) return;
+		$pages = $this->wire('pages')->find("template=admin, process=$moduleID, include=all"); 
+		foreach($pages as $page) {
+			$page->of(false); 
+			$page->process = $this; 
+			$page->save('process'); 
+			$this->message("Updated $page->path to use $this"); 
+		}
+	}
+
+	/**
+	 * Uninstall ListerPro: Convert pages using ListerPro back to use Lister
+	 *
+	 */
+	public function ___uninstall() {
+		$moduleID = $this->wire('modules')->getModuleID($this); 
+		if(!$moduleID) return;
+		$pages = $this->wire('pages')->find("template=admin, process=$moduleID, include=all"); 
+		foreach($pages as $page) {
+			$page->of(false); 
+			$page->process = 'ProcessPageLister';
+			$page->save('process'); 
+			$this->message("Reverted $page->path to use ProcessPageLister (rather than ProcessPageListerPro)."); 
+		}
+	}
+	
+	public function ___upgrade($fromVersion, $toVersion) {
+		// also trigger any pending upgrades from ProcessPageLister
+		$this->wire('modules')->get('ProcessPageLister');
+	}
+
+
+}
+

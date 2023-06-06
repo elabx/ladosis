@@ -1,0 +1,140 @@
+<?php
+/**
+ * Adds edit links to Page fields so that pages can be added or edited in a modal window without leaving the edit screen
+ *
+ * authors: Mike Spooner (thetuningspoon), macrura
+*/
+
+class AdminPageFieldEditLinks extends WireData implements Module {
+
+	private $processes = array('ProcessPageEdit', 'ProcessUser');
+
+	public static function getModuleInfo() {
+
+		return array(
+			'title' => 'Page Field Edit Links',
+			'version' => '3.0.1',
+			'summary' => 'Creates edit links on Page fields so that pages can be added or edited in a modal window without leaving the edit screen',
+			'author' => 'Mike Spooner (thetuningspoon), macrura',
+			'href' => 'http://processwire.com',
+			'singular' => true,
+			'autoload' => 'template=admin',
+			'icon' => 'edit',
+			'requires' => array('FieldtypePage'),
+		);
+	}
+
+	/**
+	 * Initialize the module
+	 *
+	 * ProcessWire calls this when the module is loaded. For 'autoload' modules, this will be called
+	 * when ProcessWire's API is ready. As a result, this is a good place to attach hooks.
+	 *
+	 */
+	public function init() {
+
+		// AJAX dispatch to retrieve page label given a page ID
+		if($this->config->ajax && $this->input->get->action == 'getPageLabel') {
+			$id = (int) $this->input->get->pageId;
+			$p = $this->pages->get($id);
+			$labelField = $this->sanitizer->fieldName($this->input->get->fieldName) ?: 'title';
+			$label = $p->$labelField;
+			if($label == '') $label = $p->name;
+			echo json_encode($label); exit;
+		}
+
+		/**
+		 * Adds additional options to the InputfieldPage edit screen.
+		 *
+		 */
+		$this->addHookAfter("InputfieldPage::getConfigInputfields", function($event) {
+			$that = $event->object;
+
+			if($that->hasFieldtype !== false) {
+				$field = wire('modules')->get('InputfieldCheckbox');
+				$field->attr('name', 'editLinks');
+				$field->attr('value', 1);
+				$field->label = __('Enable view/edit links on selected pages?');
+				$field->description = __('If checked, pages selected with this field may be viewed and edited in a modal window.');
+
+				if($that->editLinks) $field->attr('checked', 'checked');
+
+				$event->return->append($field);
+
+
+				$field = wire('modules')->get('InputfieldCheckbox');
+				$field->attr('name', 'newPageLink');
+				$field->attr('value', 1);
+				$field->label = __('Enable link to create new pages?');
+				$field->description = __('This will add a "+ New" link to the field to enable creation of new pages in a modal window. New pages will be automatically added to the field.');
+				$field->notes = __('This is different from the "Allow new pages to be created from field" option above. Instead of requiring a save, new pages will be created immediately and be made available for editing in a modal window.');
+
+				if($that->newPageLink) $field->attr('checked', 'checked');
+
+				$event->return->append($field);
+
+
+				$field = $that->modules->get('InputfieldPageListSelect');
+				$field->setAttribute('name', 'newPageParent');
+				$field->label = __('Parent for new pages created');
+				$field->attr('value', (int) $that->newPageParent);
+				$field->description = __('Select the parent to use when adding new pages (if you want to limit to a single parent).');
+				$field->notes = __('This is optional. If "Parent of selectable page(s)" is set above, the field will use that page as the parent for new pages. If only a template is specified, the new page will behave like ProcessWire\'s native "Add New" button and allow you to select a parent when creating a new page.');
+				$field->required = false;
+				$field->showIf = "newPageLink=1";
+				$event->return->append($field);
+
+			}
+		});
+
+		/**
+		 * Attaches additional JS & CSS files when editing a page that uses this field/module and passes translatable strings to $config->js
+		 *
+		 */
+		$this->addHookBefore('InputfieldPage::render', function($event) {
+			$that = $event->object;
+
+			if(in_array($that->process, $this->processes) && ($that->editLinks || $that->newPageLink)) { // Only load additional assets if editLinks or newPageLinks are enabled for this field
+				wire('modules')->get('JqueryUI')->use('modal');
+
+				// load module scripts and styles for the list links
+				$that->config->scripts->add($that->config->urls->AdminPageFieldEditLinks . "AdminPageFieldEditLinks.js?v=3");
+				$that->config->styles->add($that->config->urls->AdminPageFieldEditLinks . "AdminPageFieldEditLinks.css?v=3");
+
+				// Pass translatable strings to $config->js
+				$that->config->js('AdminPageFieldEditLinks', array(
+					'newPageLabel' => __('New'),
+					'editPageLabel' => __('View'),
+				));
+			}
+		});
+
+		/**
+		 * Adds html classes and data attributes to the markup for our javascript and CSS
+		 *
+		 */
+		$this->addHookAfter('InputfieldPage::render', function($event) {
+			$that = $event->object;
+
+			if(in_array($that->process, $this->processes)) {
+
+				$out = $event->return; // Get the final output from the render method
+				$htmlClasses = '';
+				$htmlDataAttributes = '';
+
+				if($that->editLinks) $htmlClasses .= "InputfieldPage-editLinks";
+				if($that->newPageLink) {
+					$newPageParent = $that->newPageParent ?: $that->parent_id;
+					$htmlClasses .= " InputfieldPage-newPageLink";
+					$htmlDataAttributes .= "data-parent='$newPageParent' data-template='{$that->template_id}'";
+				}
+
+				// Add to the inputfield's html classes by searching for the "<div class='" string and replacing/adding to it. We tried doing this by adding to $that->classesAdded using the addClass() method, but some of the delegated Inputfield types do not make use of these classes, so they didn't always get output.
+				$out = str_replace("<div class='", "<div $htmlDataAttributes class='$htmlClasses ", $out);
+
+				$event->return = $out;
+			}
+		});
+
+	}
+}

@@ -1,0 +1,143 @@
+<?php
+/**
+ * GoogleAnalyticsAPI (0.0.1)
+ * Google Analytics API Wrapper
+ * 
+ * @author elabx
+ * 
+ * ProcessWire 3.x
+ * Copyright (C) 2011 by Ryan Cramer
+ * Licensed under GNU/GPL v2, see LICENSE.TXT
+ * 
+ * http://www.processwire.com
+ * http://www.ryancramer.com
+ * 
+ */
+
+class GoogleAnalyticsAPI extends WireData implements Module,ConfigurableModule {
+
+    
+    
+    public $configData = array();
+
+    public $analytics = null;
+    
+	public function init() {
+		// $this->addStyle("custom.css");
+		// $this->addScript("custom.js");
+		// $this->addHookAfter("class::function", $this, "yourFunction");
+	}
+    
+    public function initClient(){
+        
+        // Use the developers console and download your service account
+        // credentials in JSON format. Place them in this directory or
+        // change the key file location if necessary.
+        
+        $configData = wire('modules')->getModuleConfigData($this);
+               
+        
+        $KEY_FILE_LOCATION = wire("config")->paths->assets . 'service.json';
+
+        $this->log->save("google-debug", $KEY_FILE_LOCATION);
+        
+        // Create and configure a new client object.
+        $client = new Google_Client();
+        $client->setApplicationName("ProcessWire CMS Analytics Reporting");
+        $client->setAuthConfig($KEY_FILE_LOCATION);
+        $client->setScopes(['https://www.googleapis.com/auth/analytics.readonly']);
+        $analytics = new Google_Service_AnalyticsReporting($client);
+
+        $this->analytics = $analytics;
+    
+        //return $analytics;
+    }
+
+    public function getMostPopular(){
+
+        $this->initClient();
+        
+        $analytics = $this->analytics;
+        
+        $VIEW_ID = "132928110";
+        
+        // Get unique pageviews and average time on page.
+        // Create the DateRange object.
+        $dateRange = new Google_Service_AnalyticsReporting_DateRange();
+        $dateRange->setStartDate("7daysAgo");
+        $dateRange->setEndDate("today");
+
+        // Create the Metrics object.
+        $sessions = new Google_Service_AnalyticsReporting_Metric();
+        $sessions->setExpression("ga:sessions");
+        $sessions->setAlias("sessions");
+
+        $dimensions = new Google_Service_AnalyticsReporting_Dimension();
+        //$dimensions->setExpression("ga:sessions");
+        $dimensions->setName("ga:pagePath");
+
+        $orderby = new Google_Service_AnalyticsReporting_OrderBy();
+        //$orderby->setOrderType("HISTOGRAM_BUCKET");
+        $orderby->setFieldName("ga:sessions");
+        $orderby->setSortOrder("DESCENDING");
+  
+        // Create the ReportRequest object.
+        $request = new Google_Service_AnalyticsReporting_ReportRequest();
+        $request->setViewId($VIEW_ID);
+        $request->setDateRanges($dateRange);
+        $request->setMetrics(array($sessions));
+        $request->setDimensions(array($dimensions));
+        $request->setOrderBys(array($orderby));
+        
+        $body = new Google_Service_AnalyticsReporting_GetReportsRequest();
+        $body->setReportRequests( array( $request) );
+        
+        $response =  $analytics->reports->batchGet( $body );
+
+        //bd($response->getReports());
+
+        foreach($response->getReports() as $i => $report){
+            //d($reports->getData()->getRows());
+    
+            //d($reports);
+            
+            //bd($report->getData()->getRows());
+            //$report = $reports[0];
+            $header = $report->getColumnHeader();
+            $dimensionHeaders = $header->getDimensions();
+            //d($dimensionHeaders);
+            $metricHeaders = $header->getMetricHeader()->getMetricHeaderEntries();
+            $rows = $report->getData()->getRows();
+
+            $sessionsPerPageData = array();
+            
+            for ( $rowIndex = 0; $rowIndex < count($rows); $rowIndex++) {
+                $row = $rows[ $rowIndex ];
+                $dimensions = $row->getDimensions();
+                $metrics = $row->getMetrics();
+                for ($i = 0; $i < count($dimensionHeaders) && $i < count($dimensions); $i++) {
+                    $sessionsPerPageData[$rowIndex]["path"] = $dimensions[$i];
+                    //print_r($dimensionHeaders[$i] . ": " . $dimensions[$i] . "\n");
+                }
+      
+                for ($j = 0; $j < count($metrics); $j++) {
+                    $values = $metrics[$j]->getValues();
+                    for ($k = 0; $k < count($values); $k++) {
+                        //$entry = $metricHeaders[$k];
+                        $sessionsPerPageData[$rowIndex]["sessions"] = $values[$k];
+                        //print_r($entry->getName() . ": " . $values[$k] . "\n");
+                    }
+                }
+            }
+            
+            //$this->log->save("google-debug", print_r($sessionsPerPageData, true));
+            
+            
+            return $sessionsPerPageData;
+    
+        }
+        
+        
+    }
+    
+}

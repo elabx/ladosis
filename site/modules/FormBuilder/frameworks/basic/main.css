@@ -1,0 +1,89 @@
+/* font family and size for Inputfield forms */
+.FormBuilder, 
+.InputfieldForm,
+.InputfieldForm input,
+.InputfieldForm textarea,
+.InputfieldForm select,
+.InputfieldForm button,
+.ui-widget {
+	font-family: Arial, sans-serif;
+	font-size: 16px; 
+	line-height: 1.5em;
+	box-sizing: border-box;
+}
+.InputfieldForm {
+	margin: 1em 0;
+}
+
+/* additional padding for inputs and textareas */
+.InputfieldForm input,
+.InputfieldForm textarea {
+	padding: 0.25em 0.35em;
+}
+
+/* error messages */
+.FormBuilder .error, 
+.InputfieldForm .error {
+	color: red;
+}
+
+/* wrapper for label + input */
+.Inputfield {
+	margin-bottom: 1.5em;
+}
+
+/* submit button */
+.InputfieldForm button {
+	padding: 0.5em 1em;
+}
+
+/* label header */
+.Inputfield .InputfieldHeader {
+	display: block;
+	font-weight: bold;
+	padding-bottom: 0.25em;
+}
+
+/* show a red asterisk after label when field "required" */
+.InputfieldStateRequired > .InputfieldHeader:first-child:after {
+	color: red;
+	content: '*';
+}
+
+/* descriptive text within Inputfields */
+.Inputfield .notes,
+.Inputfield .description {
+	margin-bottom: 0.25em;
+	margin-top: 0;
+	opacity: 0.6;
+}
+
+/* styling for fieldsets and legend */
+fieldset.InputfieldFieldset {
+	padding: 1em;
+	border: 1px solid;
+}
+fieldset.InputfieldFieldset legend {
+	font-size: 22px;
+}
+
+/* honeypot */
+#wrap_Inputfield- {
+	display: none;
+}
+
+/* clearfix */
+.pw-clearfix:before,
+.pw-clearfix:after {
+	content: "";
+	display: table;
+	border-collapse: collapse;
+}
+.pw-clearfix:after {
+	clear: both;
+}
+/* clearfix support for IE7 */
+.pw-clearfix {
+	min-height: 0; 
+}
+

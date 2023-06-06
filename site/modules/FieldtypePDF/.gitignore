@@ -1,0 +1,9 @@
+.tense
+.ampp
+/nbproject
+/vendor
+/doc
+/test/log
+/test/config.sh
+composer.lock
+tense.local.yml

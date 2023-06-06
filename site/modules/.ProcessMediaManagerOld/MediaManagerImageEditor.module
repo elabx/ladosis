@@ -1,0 +1,410 @@
+<?php namespace ProcessWire;
+
+/**
+* Media Manager: Image Editor
+*
+* This file forms part of the Media Manager Suite.
+* The Autoload module hooks into ProcessPageEditImageSelect.
+* It enables inclusion of a page's Media Manager images for selection in the RTE.
+*
+* @author Francis Otieno (Kongondo) <kongondo@gmail.com> kongondo.com
+*
+* This is a Copyrighted Commercial Module. Please do not distribute or host publicly. The license is not transferable.
+*
+* MediaManagerImageEditor for ProcessWire
+* Copyright (C) 2015 by Francis Otieno
+* Licensed under a Commercial Licence (see README.txt)
+*
+*/
+
+class MediaManagerImageEditor extends WireData implements Module {
+
+	/**
+	 * Return information about this module (required).
+	 *
+	 *	@access public
+	 *	@return array module info
+	 *
+	 */
+	public static function getModuleInfo() {
+
+		return array(
+			'title' => 'Media Manager (Enhanced Image and Link Selector/Editor)',
+			'author' => 'Francis Otieno (Kongondo)',
+			'version' => 9,
+			'href' => 'http://mediamanager.kongondo.com',
+			'summary' => 'Customise and extend ProcessWire ProcessPageEditImageSelect and ProcessPageEditLink',
+			'singular' => true,
+			#'autoload' => true,
+			'autoload' => 'template=admin',
+			'requires' => 'ProcessMediaManager',
+
+		);
+
+	}
+
+	protected $currentPage;
+
+	/**
+	 *	Initialise the module.
+	 *
+	 * ProcessWire calls this when the module is loaded. For 'autoload' modules, this will be called.
+	 * when ProcessWire's API is ready. As a result, this is a good place to attach hooks.
+	 *
+	 *	@access public
+	 *
+	 */
+	public function init() {
+
+		// output a simple config to allow for a translationg of text for a button appended vis js
+		$this->mmImageEditorConfigs();
+
+		// 1. Hook into ProcessPageEditImageSelect::execute()
+		$this->pages->addHookBefore("ProcessPageEditImageSelect::execute", $this, "customImageSelector");
+		$this->pages->addHookAfter("ProcessPageEditLink::execute", $this, "customLinkSelector");
+
+		// add our scripts
+		$config = $this->wire('config');
+		$url = $config->urls->ProcessMediaManager;
+		$config->scripts->add($url . "MediaManagerImageEditor.js");
+
+		// 2. only add hook after ProcessPageEditImageSelect::executeEdit if called from ProcessMediaManager
+		$f = $this->wire('sanitizer')->fieldName($this->wire('input')->get->field);
+		if($f === 'media_manager_image') {
+			$this->pages->addHookAfter("ProcessPageEditImageSelect::executeEdit", $this, "imageVariationSave");
+		}
+
+	}
+
+	/**
+	 * Hooks into ProcessPageEditImageSelect::execute().
+	 *
+	 * This Hook allows us to add Media Manager images present in the current page for selection in RTE.
+	 * Also works if selecting from other pages.
+	 * We hook before to entirely replace the method ___execute().
+	 *
+	 * @access protected
+	 * @param $event The object returned by the hook.
+	 * @return string $value.
+	 *
+	 */
+	protected function customImageSelector(HookEvent $event) {
+		if('image' != $this->wire('page')->name) return;// @todo: would this work in a ML environment? are such pages' names translated?
+		$currentPageID = (int) $this->wire('input')->get->id;
+		if(!$currentPageID) return;
+
+		$this->currentPage = $this->wire('pages')->get($currentPageID);
+
+		// if we are editing, let ProcessPageEditImageSelect::executeEdit() do its job, so we return
+		if($this->wire('input')->get->file) return;
+
+		$event->replace = true;//we are entirely replacing the method with our own
+		$out = $this->executeImageSelect();
+		//set the modified value back to the return value
+		$event->return = $out;
+
+	}
+
+	/**
+	 * Hooks into ProcessPageEditLink::execute().
+	 *
+	 * This Hook allows us to add links from Media Manager media into RTE.
+	 * Also works if selecting from other pages.
+	 * We hook before to entirely replace the method ___execute().
+	 *
+	 * @access protected
+	 * @param $event The object returned by the hook.
+	 * @return string $value.
+	 *
+	 */
+	protected function customLinkSelector(HookEvent $event) {
+		if('link' != $this->wire('page')->name) return;// @todo: would this work in a ML environment? are such pages' names translated?
+		$renderedMarkup = $event->return;
+		$replacementHTML = $this->renderLinkMediaManagerLINK();
+		$pattern = "/<p class=[\"']?notes[\"']?[\s\S]+?<\/li>/";// @note: we match either double or single quotes either side of 'notes'
+		$out = preg_replace($pattern, '$0' . $replacementHTML, $renderedMarkup, 1);// @note: appending using back references + limiting to one
+		//set the modified value back to the return value
+		$event->return = $out;
+	}
+
+	/**
+	 * Hooks into ProcessPageEditImageSelect::executeEdit().
+	 *
+	 * This Hook allows us to 'permanently' save image variations made within /media-manager/image/edit/ to the page containing the image.
+	 * Such variations are normally saved with a temp status until the image-containing page is saved.
+	 *
+	 * @access protected
+	 *
+	 */
+	protected function imageVariationSave(HookEvent $event) {
+
+		$post = $this->wire('input')->post;
+		if( $post->submit_save_replace || $post->submit_save_copy ) {
+			$id = (int) $post->page_id;
+			$p = $this->wire('pages')->get($id);
+			if($p && $p->id > 0 && $p->template == 'media-manager-image') {
+				$pageimages = $p->getUnformatted('media_manager_image');
+				if(count($pageimages)) {
+					$pageimage = $pageimages->last();// last made variation
+					$pageimage->isTemp(false);
+					$p->save('media_manager_image');
+				}
+			}
+		}
+
+	}
+
+	/**
+	 * Find Media Manager images on this page to insert in RTE selection.
+	 *
+	 * @return array $images.
+	 *
+	 */
+	public function findMediaManagerImages() {
+
+		$images = array();
+		$currentPage = $this->currentPage;
+		$fields = $currentPage->fields;
+		$skipMediaTypes = array(1, 2, 4);// we skip audio, document and video types
+
+		foreach ($fields as $field) {
+			if(!$field->type instanceof FieldtypeMediaManager) continue;
+
+			$media = $currentPage->getUnformatted($field->name);
+			if(!count($media)) continue;
+
+			foreach ($media as $image) {
+				if(in_array($image->type, $skipMediaTypes)) continue;
+				$key = $image->id . ',' . $image->media->basename;  // page_id,basename for repeater support (@note: page_id here is the page the image lives in)
+				$images[$key] = $image->media;
+			}
+
+		}
+
+		return $images;
+
+	}
+
+	/**
+	 * Create a link to Media Manager RTE.
+	 *
+	 * We use the link to offer an alternative to insert images from Media Manager Library.
+	 * We access link via pwimage (CKEditor) plugin which opens ProcessPageEditImageSelect.
+	 * We are hooking into that method and add the link to ProcessPageEditImageSelect::execute().
+	 *
+	 * @return String $out Anchor Markup linking to Media Manager RTE.
+	 *
+	 */
+	public function renderLinkMediaManagerRTE() {
+		$out = '';
+		$queryString = '?id=' . $this->currentPage->id . '&edit_page_id=' . $this->currentPage->id . '&modal=1';
+		$href = $this->wire('config')->urls->admin . 'media-manager/rte/image/' . $queryString;
+		$out .= '<span>' . $this->_('Click to select images from') . ' ' .
+					'<a href="'. $href . '">' . $this->_('Media Manager Library') . '</a>' .
+				'</span>';
+		return $out;
+	}
+
+	/**
+	 * Create a link to Media Manager LINK.
+	 *
+	 * We use the link to offer an alternative to insert links to media in Media Manager Library.
+	 * We access link via pwlink (CKEditor) plugin which opens ProcessPageEditLink.
+	 * We are hooking into that method and add the link to ProcessPageEditLink::execute().
+	 *
+	 * @return String $out Anchor Markup linking to Media Manager LINK.
+	 *
+	 */
+	public function renderLinkMediaManagerLINK() {
+
+		$out = '';
+
+		$href = $this->wire('config')->urls->admin . 'media-manager/link/?&modal=1';
+
+		$out .=
+			'<li class="Inputfield InputfieldMarkup InputfieldColumnWidthFirst" id="media_manager_link">
+				<label class="InputfieldHeader InputfieldStateToggle" for="">Select media from Media Manager
+					<i class="toggle-icon fa fa-angle-right" data-to="fa-angle-down fa-angle-right"></i>
+				</label>
+				<div class="InputfieldContent">
+					<span>' . $this->_('Click to select media from ') .
+						'<a id="media_manager_pwlink" href="' . $href. '">' . $this->_('Media Manager Library') . '</a>
+					</span>
+				</div>
+			</li>';
+
+		return $out;
+
+	}
+
+	/**
+	 * Outputs javascript configuration values for this module.
+	 *
+	 * @access protected
+	 * @return $scripts string.
+	 *
+	 */
+	protected function mmImageEditorConfigs() {
+		// translatable text for Media Manager button
+		$options = array('config' => array('buttontext' => $this->_('Select from Media Manager')));
+		$scripts = $this->wire('config')->js($this->className(), $options);
+		return $scripts;
+	}
+
+	/**
+	 * 	Called only when the module is installed.
+	 *
+	 *	@access public
+	 *
+	 */
+	public function ___install() {
+
+		//Don't need to add anything here...
+
+	}
+
+	/**
+	 *	Called only when the module is uninstalled.
+	 *
+	 *	This should return the site to the same state it was in before the module was installed.
+	 *
+	 *	@access public
+	 *
+	 */
+	 public function ___uninstall() {
+
+		// Don't need to add anything here...
+
+	}
+
+
+	#--------------------  BELOW THIS LINE MODIFIED FROM @Copyright ProcessWire ProcessPageEditImageSelect.module (MPL License) --------------------------
+
+	/**
+	 * Below method modified from the ProcessWire Class 'ProcessPageEditImageSelect::execute()'
+	 *
+	 * ProcessWire Image Select + Edit Process
+	 *
+	 * Provides the image selecting and editing capability for rich text editors (TinyMCE/CKEditor)
+	 *
+	 * ProcessWire 2.x
+	 * Copyright (C) 2015 by Ryan Cramer
+	 * This code below is licensed under Mozilla Public License v2.0 http://mozilla.org/MPL/2.0/
+	 *
+	 * https://processwire.com
+	 */
+
+
+	/**
+	 * Default execute: display list of images on page for selection
+	 *
+	 * @return string
+	 * @throws WireException
+	 *
+	 */
+	public function ___executeImageSelect() {
+
+		$out = '';
+		$input = $this->wire('input');
+		$modules = $this->wire('modules');
+		$sanitizer = $this->wire('sanitizer');
+
+		$currentPage = $this->currentPage;
+		if($this->wire('config')->demo) throw new WireException("Sorry, image editing functions are disabled in demo mode");
+
+		if(!$currentPage) {
+			$error = "No page provided";
+			$this->error($error);
+			return "<p>$error</p>";
+		}
+
+
+		$e = new ProcessPageEditImageSelect();// @kongondo for Media Manager
+
+		if($input->get->file) return $e->executeEdit();
+
+		$images = $e->getImages($currentPage, $currentPage->fields);
+		$mediaManagerImages = $this->findMediaManagerImages();// @kongondo for Media Manager
+
+		$images = array_merge($images, $mediaManagerImages);// @kongondo: merge 'normal' current page images with media manager images
+
+		if(count($images)) {
+			$winwidth = (int) $input->get->winwidth;
+			$in = $modules->get('InputfieldImage');
+			$in->adminThumbs = true;
+
+			foreach($images as $image) {
+				if($e->noThumbs) {
+					$width = $image->width();
+					$alt = $sanitizer->entities1($image->description);
+					if($width > $e->maxImageWidth) $width = $e->maxImageWidth;
+					$img = "<img src='$image->URL' width='$width' alt=\"$alt\" />";
+				}
+
+				else {
+
+					$info = $in->getAdminThumb($image);
+					$img = $info['markup'];
+				}
+
+				$out .= "\n\t<li><a href='./edit?file={$image->page->id},{$image->basename}&amp;modal=1&amp;id={$currentPage->id}&amp;winwidth=$winwidth'>$img</a></li>";
+
+			}
+
+			$class = $e->noThumbs ? "" : " class='thumbs'";
+			$out = "\n<ul id='select_images'$class>$out\n</ul>";
+
+		}
+
+		$form = $modules->get("InputfieldForm");
+		$form->action = "./";
+		$form->method = "get";
+
+		// @kongondo: adding markup with link to Media Manager
+		$m = $modules->get('InputfieldMarkup');
+		$m->attr('id', 'media_manager_rte');
+ 		$m->attr('value', $this->renderLinkMediaManagerRTE());
+ 		$m->label = $this->_('Select images from Media Manager');
+ 		#$m->collapsed = Inputfield::collapsedYes;
+ 		$form->add($m);
+
+		$field = $modules->get("InputfieldPageListSelect");
+		$field->label = $this->_("Images on Page:") . ' ' . $currentPage->get("title") . " (" . $currentPage->path . ")"; // Headline for page selection, precedes current page title/url
+		$field->description = $this->_("If you would like to select images from another page, select the page below."); // Instruction on how to select another page
+
+		$field->attr('id+name', 'page_id');
+		$field->value = $currentPage->id;
+		$field->parent_id = 0;
+		$field->collapsed = count($images) ? Inputfield::collapsedYes : Inputfield::collapsedNo;
+		$field->required = true;
+		$form->append($field);
+
+		// locate any image fields
+		$imageFields = $e->getImageFields($currentPage);
+		if(count($imageFields)) {
+			$imageFieldNames = implode(',', array_keys($imageFields));
+			$btn = $modules->get('InputfieldButton');
+			$btn->href = "../edit/?modal=1&id={$currentPage->id}&fields=$imageFieldNames&uploadOnlyMode=1";
+			$btn->value = $this->_('Upload Image');
+			$btn->addClass('upload pw-modal-button pw-modal-button-visible');
+			$btn->icon = 'upload';
+			$changes = $input->get('changes');
+			if($changes) foreach(explode(',', $changes) as $name) {
+				$name = $sanitizer->fieldName($name);
+				$field = $this->wire('fields')->get($name);
+				if(!$field) continue;
+				$out .= "<script>refreshPageEditField('$name');</script>";
+			}
+		} else $btn = null;
+
+		$out = $form->render() . $out;
+		if($btn) $out .= $btn->render();
+
+		return "<div id='ProcessPageEditImageSelect'>" . $out . "\n</div>";
+
+	}
+
+
+
+}
+

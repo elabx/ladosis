@@ -1,0 +1,51 @@
+/**
+*
+* CSS styles for the Commercial ProcessWire Module Media Manager (Inputfield)
+*
+* @author Francis Otieno (Kongondo) <kongondo@gmail.com>
+*
+* Copyright (C) 2015 by Francis Otieno
+*
+*/
+
+/* ### @base pixel size: 16px ### */
+
+/** general **/
+/*## deal with rogue floats ##*/
+.clearfix:after {content: ""; display: table; clear: both;}
+
+/** div **/
+div.sortable {
+	margin: 0;
+	padding: 0;
+	width: 100%;
+	clear: both;
+	min-height: 75px;
+}
+
+/** headers **/
+div.sortable h4{margin:0;}
+
+/** anchor **/
+a:focus {outline:0;}
+
+/** button **/
+button:focus {outline:0;}
+
+/** span **/
+div.mm_actions_wrapper span.mm_media_count_wrapper {margin-right: 0.75em;}
+span.mm_allowed_media_label, span.mm_media_count_label {font-weight: bold}
+span.mm_media_count_label {font-weight: bold; margin-left: 1em;}
+small.mm_media_count_wrapper span {font-weight: bold;}
+
+/** magnific **/
+.mfp-iframe-holder .mfp-content {
+	line-height: 0;
+	width: 100%;
+	height: auto;
+	max-width: 1870px;
+}
+
+
+
+

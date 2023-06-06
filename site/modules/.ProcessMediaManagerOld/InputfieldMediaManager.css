@@ -1,0 +1,151 @@
+/**
+*
+* CSS styles for the Commercial ProcessWire Module Media Manager (Inputfield)
+*
+* @author Francis Otieno (Kongondo) <kongondo@gmail.com>
+*
+* Copyright (C) 2015 by Francis Otieno
+*
+*/
+
+/* ### @base pixel size: 16px ### */
+
+/** general **/
+/*## deal with rogue floats ##*/
+.clearfix:after {content: ""; display: table; clear: both;}
+
+/** div **/
+div.actions_wrapper {min-height: 2.5em;border-bottom: 1px dotted #DCDCDC; margin-bottom: 1em;}
+div.actions_add {float: left; width: 80%;}
+div.actions_remove {float: left; width: 20%;}
+
+div.sortable {
+	margin: 0;
+	padding: 0;
+	width: 100%;
+	clear: both;
+}
+
+div.page_media_wrapper {position: relative;}
+div.sortable div.grid {position: relative; width: 10%; float: left;}
+
+div.sortable div.list {
+	width: 100%;
+	height: auto;
+	margin-bottom: 0.188em;
+	padding: 0;
+	background-color: #F4F4F4;
+}
+
+div.hide {display: none;}
+div.page_media_headers {width: 100%;}
+div.media_image_zoom {position: absolute; top: 0; left: 0;}
+
+/** headers **/
+div.sortable h4{margin:0;}
+
+/** i **/
+i.media_trash, a.grid_view i, a.list_view i {font-size: 1.15em !important;}
+div.media_image_zoom a.media_image_zoom i {visibility: hidden;}
+
+span.media_thumb:hover + div.media_image_zoom a.media_image_zoom i,
+div.media_image_zoom a.media_image_zoom:hover i {
+	visibility: visible;
+}
+
+/** anchor **/
+div.actions_wrapper a {display: inline-block;}
+div.actions_add a {margin-right: 0.35em;}
+div.actions_add a.add_media {margin-left: 1em;}
+div.actions_remove a {float: right;display: inline-block;}
+a.unselect_all {margin-right: 1em; margin-left: 0.175em;}
+a:focus {outline:0;}
+
+div.media_image_zoom a.media_image_zoom {
+	width: 15px;
+	height: 15px;
+	color: #fa5400;
+	background-color: rgba(0, 0, 0, 0.5);
+	padding: 2px;
+	border-radius: 0;
+}
+
+div.media_image_zoom a.media_image_zoom:hover,
+img.image:hover + div.media_image_zoom a.media_image_zoom {
+	background-color: rgba(0, 0, 0, 0.5);
+}
+
+div.media_image_zoom a.media_image_zoom {padding: 0; background-color: transparent;}
+
+/** image **/
+div.sortable div.list img.image {width: 4.688em; height: auto; display: inline-block;}
+div.sortable div.list img.audio, div.sortable div.list img.document, div.sortable div.list img.video {width: auto; height: 3.750em; display: inline-block;}
+div.page_media img {cursor: move;}
+
+div.page_media img {
+	-moz-border-radius: 3px;
+	-webkit-border-radius: 3px;
+	border-radius: 3px;
+	width: auto;
+	height: 75px;
+}
+
+div.page_media img.image {width: 100px;}
+div.page_media img.highlighted {border: 2px solid #B50E60;} /*PW pink*/
+
+/** input **/
+div.page_media input[type=checkbox]{display: none;}
+
+/** button **/
+button:focus {outline:0;}
+
+/** span **/
+div.grid span.media_title {
+	margin: 0;
+	display: block;
+	color: #749CBE;
+	font-size: 0.77em;
+	line-height: 1.35em;
+	margin-bottom: 0.75em;
+}
+
+div.grid span.media_thumb {width: 100px; display: inline-block;}
+div.media_image_zoom span {position: absolute; top: 0; left: 0;}
+
+div.grid span.media_name, div.grid span.media_desc, div.grid span.media_tags {display: none;}
+div.page_media_headers span, small.media_allowed span, small.media_count span {font-weight: bold;}
+div.page_media_headers span, div.page_media_wrapper.list span {display: inline-block; vertical-align: top;}
+div.page_media_headers span.header_thumb, div.list span.media_thumb {width: 7%; }
+div.list span.media_title, div.list span.media_name, div.page_media_headers span.header_title, div.page_media_headers span.header_name {width: 20%;}
+div.list span.media_desc, div.page_media_headers span.header_desc {width: 32%;}
+div.list span.media_tags, div.page_media_headers span.header_tags {width: 21%;}
+div.page_media_wrapper.list span {font-size: 85%;}
+
+
+/** small **/
+div.actions_wrapper small.media_field_full, div.actions_wrapper small.media_count,  div.actions_wrapper small.media_allowed {margin-left: 1em; font-size: 80%;}
+
+/** magnific **/
+.mfp-iframe-holder .mfp-content {
+	line-height: 0;
+	width: 100%;
+	height: auto;
+	max-width: 1870px;
+}
+
+/*############## - mobile - #########################*/
+@media screen and (max-width: 640px) {div.sortable div.grid {width: 50%}/*2*/}
+@media screen and (min-width: 640px) and (max-width: 767px) {div.sortable div.grid {width: 33%}}/*3*/
+@media screen and (min-width: 768px) and (max-width: 1024px) {div.sortable div.grid {width: 25%}}/*4*/
+
+@media screen and (max-width: 1279px) {
+	div.page_media_headers span{display: none;}
+	div.list span:not(.media_title){display: none !important;}
+	div.list span.media_title{width: 15em;}
+}
+
+@media screen and (max-width: 320px) {div.list span.media_title{width: 15em;}}
+@media screen and (min-width: 480px) and (max-width: 1279px) {div.list span.media_title{width: 25em;}}
+
+
+

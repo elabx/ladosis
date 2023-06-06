@@ -1,0 +1,436 @@
+<?php namespace ProcessWire;
+
+/**
+* Media Manager: Inputfield
+*
+* Inputfield that graphically displays a list/grid of a page's Media Manager manager.
+* Graphical User Interface for FieldtypeMediaManager.
+*
+* @author Francis Otieno (Kongondo) <kongondo@gmail.com> kongondo.com
+*
+* This is a Copyrighted Commercial Module. Please do not distribute or host publicly. The license is not transferable.
+*
+* InputfieldMediaManager for ProcessWire
+* Copyright (C) 2015 by Francis Otieno
+* Licensed under a Commercial Licence (see README.txt)
+*
+*/
+
+class InputfieldMediaManager extends Inputfield {
+
+	public static function getModuleInfo() {
+		return array(
+			'title' => 'Media Manager (Inputfield)',
+			'author' => 'Francis Otieno (Kongondo)',
+			'version' => 12,
+			'href' => 'http://mediamanager.kongondo.com',
+			'summary' => 'Media Manager: GUI (Inputfield) for FieldtypeMediaManager.',
+			'requires' => 'FieldtypeMediaManager',
+			);
+	}
+
+	protected $currentPage;
+	protected $mediaManagerField;
+	// to check if can upload anywhere if the setting is on
+	protected $uploadAnywhere;
+	protected $mmUtilities;
+	protected $jfu;
+
+
+	/* ######################### - SET UP - ######################### */
+
+	/**
+	 * Initialise the module. This is an optional initialisation method called before any execute methods.
+	 *
+	 * Initialises various class properties ready for use throughout the class.
+	 *
+	 * @access public
+	 *
+	 */
+	public function init() {
+
+		parent::init();
+
+		$config = $this->wire('config');
+		// shared styles and scripts
+		$url = $config->urls->ProcessMediaManager;
+		$config->styles->add($url . "MediaManager.css");
+		$config->scripts->add($url . "MediaManager.js");
+
+		// needed for lightbox gallery for image media (i.e. the blueimp gallery; not the upload features!)
+		$jfuURL = $config->urls->JqueryFileUpload;
+		// @note: some of these included by configJFUStyles() in JFU!
+		$config->scripts->add($jfuURL . "js/gallery/jquery.blueimp-gallery.min.js");
+		$config->scripts->add($jfuURL . "js/gallery/blueimp-gallery-audio.js");
+		$config->scripts->add($jfuURL . "js/gallery/blueimp-gallery-pdf.js");// @note: by @kongondo
+		$config->scripts->add($jfuURL . "js/gallery/blueimp-gallery-video.js");
+		$config->styles->add($jfuURL . 'css/blueimp-gallery.min.css');
+
+		$modules = $this->wire('modules');
+		$modules->get("Jquery");
+		$ui = $modules->get("JqueryUI");
+		$ui->use("modal");
+		$modules->get("JqueryMagnific");
+
+		$dir = dirname(__FILE__);
+		require_once("$dir/MediaManagerRender.php");
+
+	}
+
+	public function setPage(Page $page) {
+		$this->page = $page;
+	}
+
+	public function setField(Field $field) {
+		$this->field = $field;
+	}
+
+	/**
+	 * Get an instance of Media Manager Utilities from the Media Manager Field.
+	 * For use in this Inputfield.
+	 *
+	 * @access public
+	 * @param MediaManagerUtilities $mmUtilities An instance of MediaManagerUtilities.
+	 *
+	 */
+	public function setMediaManagerUtiltities($mmUtilities) {
+		$this->mmUtilities = $mmUtilities;
+	}
+
+	/* ######################### - INPUTFIELD STUFF - ######################### */
+
+	/**
+	 * Inputfield's configurations.
+	 *
+	 * This is appended to the Input Tab.
+	 *
+	 * @access public
+	 * @return Inputfield $inputfields.
+	 *
+	 */
+	public function ___getConfigInputfields() {
+
+		$inputfields = parent::___getConfigInputfields();
+
+		$modules = $this->wire('modules');
+
+
+		## 1/2 INPUTFIELD/GENERAL PAGE EDIT SETTINGS ##
+
+		$fs = $modules->get("InputfieldFieldset");// @note: we wrap these settings in a fieldset
+		$fs->label = $this->_('Media Manager: General Settings');
+		$fs->collapsed = 1;// always collapsed
+
+		// for specifying text label for modal link. Default is 'Add Pages'
+		// this appears in the page being edited
+		// text [modalLinkLabel]:
+		$f = $modules->get("InputfieldText");
+		$f->attr('name', 'modalLinkLabel');
+		$f->attr('value', $this->modalLinkLabel ? $this->modalLinkLabel : $this->_('Add Media'));
+		$f->label = $this->_('Modal Link Label');
+		$f->description .= $this->_('Text label to show for the modal link for adding media to the page.');
+		$f->notes = $this->_('Default is: Add Media.');
+		// for UX: show only if 'Use Text' instead of 'Use Icons' is true (@see below)
+		$f->showIf = 'showIcons=2';
+
+		$fs->add($f);
+
+		// checkbox [insertAndClose]: whether after inserting media in InputfieldMediaManager from the Media Library, to immediately close the magnificPopup dialog
+		$f = $modules->get("InputfieldCheckbox");
+		$f->attr('name', 'insertAndClose');
+		$f->attr('value', 1);
+		$f->attr('checked', $this->insertAndClose ? 'checked' : '');
+		$f->label = $this->_('Insert Media and Close Dialog');
+		$f->label2 = $this->_('Insert and Close');
+		#$f->collapsed = 1;// always collapsed
+		$f->notes = $this->_('If checked, will immediately close dialog/popup after media is added to InputfieldMediaManager.');
+
+		$fs->add($f);
+
+		// radios [enableUploadAnywhere]: allow users to add media to inputfield directly via drag and drop
+		$f = $modules->get('InputfieldRadios');
+		$f->attr('name', 'enableUploadAnywhere');
+		$f->attr('value', $this->enableUploadAnywhere ? $this->enableUploadAnywhere : 2);
+		$f->label =  $this->_('Enable Upload Anywhere');
+		$f->description = $this->_('Specify if users are allowed to add media to this inputfield via drag and drop.');
+		$f->notes = $this->_("When enabled, users will be able to instantly upload items to the Media Library via drag and drop and have the media inserted into the inputfield without having to do this from the modal. Please note that other relevant settings still apply, for instance, whether media are published on upload, if the user has permission to upload, allowed media, maximum media allowed, etc. For this to work properly, the global setting for 'After Upload' should be to immediately publish uploaded items, noting that unpublished media cannot be added to inputfields.");
+		$radioOptions = array (
+			1 => __('Yes'),
+			2 => __('No'),
+	 	);
+
+		$f->addOptions($radioOptions);
+
+		$fs->add($f);
+
+		// @note: we are also checking in MediaManagerRender if MM noEdit is in effect
+		// radios [allowEditSelectedMedia]: allow users to edit selected pages
+		$f = $modules->get('InputfieldRadios');
+		$f->attr('name', 'allowEditSelectedMedia');
+		$f->attr('value', $this->allowEditSelectedMedia ? $this->allowEditSelectedMedia : 2);
+		$f->label =  $this->_('Allow Users to Edit Selected Media');
+		$f->description = $this->_('Specify whether users are allowed to edit media saved in the field.');
+		$f->notes = $this->_("Please note that users must still have 'page-editable' access and, if applicable, 'media-manager-edit' permission to be able to edit.");
+		$radioOptions = array (
+			1 => __('Yes'),
+			2 => __('No'),
+	 	);
+
+		$f->addOptions($radioOptions);
+
+		$fs->add($f);
+
+		// radios [showIcons]: show icons vs text for action strips
+		// this is for the add/insert and trash icons
+		$f = $modules->get('InputfieldRadios');
+		$f->attr('name', 'showIcons');
+		// if no setting here, we show text (backward compatibility)
+		$f->attr('value', $this->showIcons ? $this->showIcons : 2);
+		$f->label =  $this->_('Use Icons or Text for Actions');
+		$f->description = $this->_('Specify whether to show icons or text in the actions strip in the field.');
+		$f->notes = $this->_("Please note this only refers to the insert/add icon in the inputfield.");
+		$radioOptions = array (
+			1 => __('Use Icons'),
+			2 => __('Use Text'),
+	 	);
+
+		$f->addOptions($radioOptions);
+
+		$fs->add($f);
+
+		$inputfields->add($fs);
+
+		## 2/2 CUSTOM COLUMNS/ FIELDS SETTINGS ##
+
+		$fs = $modules->get('InputfieldFieldset');
+		$fs->label = $this->_('Custom Fields');
+
+		// radios [showColumns]: show global custom columns/custom for this inputfield/none
+		$f = $modules->get('InputfieldRadios');
+		$f->attr('name', 'showColumns');
+		$f->attr('value', $this->showColumns ? $this->showColumns : 1);
+		$f->label =  $this->_('Show Custom Fields');
+		$f->description = $this->_('Specify which fields in your respective media pages to show in tabular media view.');
+		$f->notes = $this->_("Global will show all the columns/fields selected in Media Manager settings. Custom will allow you to select specific fields for this inputfield only. These do not have to match those in your global settings. To see the selectable fields, first select 'Custom for Inputfield' and then save. You will then be able to select the fields. None will only show columns with the media icon/thumb and their meta (description, tags, file size, etc.).");
+		$radioOptions = array (
+			1 => __('Global Media Manager'),
+			2 => __('Custom for Inputfield'),
+			3 => __('None'),
+	 	);
+
+		$f->addOptions($radioOptions);
+
+		$fs->add($f);
+
+		$media = array(1=>'audio', 2=>'document', 3=>'image', 4=>'video');
+
+		if(2 == (int) $this->showColumns) {
+			/*1. Default Custom Columns: Image/Audio/Document/Video @note: globally disallowed will not be available */
+			$defaultCustomColumns = $this->mmUtilities->getSettingsDefaultCustomColumns();
+			foreach ($defaultCustomColumns as $name => $label) {
+				// if media type not allowed, no need to display its custom columns
+				$mediaTypeInt = $this->mmUtilities->mediaTypeInt($name);
+				if(is_array($this->allowedMedia) && !in_array($mediaTypeInt,$this->allowedMedia)) continue;
+				$customColumnValues = $this->{"{$name}CustomColumns"};
+				$f = $modules->get('InputfieldAsmSelect');
+				//$f->attr('name', "mm_custom_columns_{$name}");
+				$f->attr('name', "{$name}CustomColumns");
+				$f->collapsed = Inputfield::collapsedYes;
+				$f->label = $label;
+				$f->description = $this->_("Select custom fields from the {$name} media page to display.");
+				$f->notes = $this->_("Please note this only works when using Thumbs View Tabular. Also note that only supported Fieldtypes are available for selection.");
+				$f->attr('value', $customColumnValues);
+				// for UX: show only if using 'Custom columns for inputfield'
+				$f->showIf = 'showColumns=2';
+				// custom fields in a media manager template.
+				$customColumnOptions = $this->mmUtilities->getTemplateFields("media-manager-{$name}");
+				$f->addOptions($customColumnOptions);
+				$fs->add($f);
+			}
+		}
+
+		$inputfields->add($fs);
+
+		return $inputfields;
+
+	}
+
+	/* ######################### - AJAX - ######################### */
+
+	/**
+	 * Outputs javascript configuration values for this module.
+	 *
+	 * @access protected
+	 * @return string $scripts.
+	 *
+	 */
+	protected function ajaxConfigs() {
+
+		$session = $this->wire('session');
+		$tokenName = $session->CSRF->getTokenName();
+		$tokenValue = $session->CSRF->getTokenValue();
+
+		$formData = array($tokenName => $tokenValue, 'action2'=>'upload_insert');
+
+		$unknownError = $this->_('Media Manager: Error encountered. Request could not be completed.');
+		$jfuAnywhereUploadSuccess = $this->_('Media Manager: Media successfully uploaded');
+		$jfuAnywhereUploadFail = $this->_('Media Manager: Some media could not be uploaded');
+		$moveToLibraryFail = $this->_('Media Manager: Media could not be moved to Media Library');
+
+		// options for ajax calls
+		$options = array('config' =>
+			array(
+				'mediaManagerContext' => 'InputfieldMediaManager',
+				'currentPageID' => $this->currentPage->id,
+				'unknownError' => $unknownError,
+				'jfuAnywhereUploadSuccess' => $jfuAnywhereUploadSuccess,
+				'jfuAnywhereUploadFail' => $jfuAnywhereUploadFail,
+				'moveToLibraryFail' => $moveToLibraryFail,
+				'uploadAnywhere' => $this->uploadAnywhere,
+				'formData' => $formData,
+			)
+		);
+
+		//$scripts = $this->wire('config')->js($this->className(), $options);
+		// @note: we change this to 'config.MediaManager' from config.ProcessMediaManager so we can share variable name with InputfieldMM.js
+		$scripts = $this->wire('config')->js('MediaManager', $options);
+
+		return $scripts;
+
+	}
+
+	/* ######################### - MARKUP RENDERERS - ######################### */
+
+
+
+	/**
+	 * Using ProcessWire's renderRender() to load assets before render().
+	 *
+	 * Mainly need this for repeaters.
+	 *
+	 * @param Inputfield $parent
+	 * @param boolean $renderValueMode
+	 * @return parent::renderReady
+	 *
+	 */
+	public function renderReady(Inputfield $parent = null, $renderValueMode = false){
+
+		$process = $this->wire('process');
+		//$pageField = $this->wire('fields')->get($this->name);
+		$this->mediaManagerField = $this->hasField;// @note: can also just get/set from setField above!
+
+		// first, we check if our media manager inputfield is in a repeater
+		preg_match('/(_repeater[0-9]+)$/', $this->name, $match);
+		// if in a repeater, we adjust our 'current' page accordingly => it will be the repeater page
+		// that's where our items will live for this page
+		if(count($match)) {
+			$repeatPageID = (int) str_replace('_repeater', '', $match[0]);
+			$page = $this->wire('pages')->get($repeatPageID);
+			$this->mediaManagerField->mmRepeaterName = $this->name;// @note: adding custom property
+		}
+
+		// so that we can get the $page->ID
+		elseif($process && $process->className() == 'ProcessPageEdit') {
+			$page = $process->getPage();// get the page being edited
+		}
+
+		$this->currentPage = $page;
+
+		/******** - JQUERY FILE UPLOAD CONFIG SETTINGS - *******/
+
+		$permissions = $this->wire('permissions');
+		$noUpload = $permissions->get('media-manager-upload')->id && !$this->user->hasPermission('media-manager-upload') ? true : false;
+		$this->uploadAnywhere = false;
+		if(((int)$this->enableUploadAnywhere == 1) && (!$noUpload)) {
+			$this->uploadAnywhere = true;
+			/******** - JQUERY FILE UPLOAD SCRIPTS AND STYLES - *******/
+			$this->jfu = new JqueryFileUpload();
+			$this->jfu->configJFUScripts();
+			$this->jfu->configJFUStyles();
+			$this->jfu->configsJFU(
+				$this->mmUtilities->getConfigsJFUOptions($this->uploadAnywhere,array('action2'=>'upload_insert'), 0)
+			);
+		}
+
+		$this->ajaxConfigs();
+
+		return parent::renderReady($parent, $renderValueMode);
+
+	}
+
+	/**
+	 * Render the entire markup returned for the Media Manager field.
+	 *
+	 * @access public
+	 * @return string $out Markup of actions and media views (grid + tabular).
+	 *
+	 */
+	public function ___render() {
+		$this->mmRender = new MediaManagerRender($this->currentPage, $this->mediaManagerField, 2);
+		$out = $this->mmRender->renderInputfield();
+		return $out;
+	}
+
+	/* ######################### - PROCESS ACTIONS - ######################### */
+
+	/**
+	 * Return true if this field is empty (MediaManagerArray is empty), or false if it is not.
+	 *
+	 * Used by the 'required' check to see if the field is populated.
+	 * Overriding parent::isEmpty().
+	 *
+	 * @access public
+	 * @return bool $empty Whether field empty or not.
+	 *
+	 */
+	public function isEmpty() {
+		$empty = true;
+		$value = $this->attr('value');
+		if(is_object($value) && get_class($value) == 'MediaManagerArray' && count($value)) $empty = false;
+		return $empty;
+	}
+
+	/**
+	 * Process input for the values sent from this field.
+	 *
+	 * @access public
+	 *
+	 */
+	public function ___processInput(WireInputData $input) {
+
+		if(!$this->page || !$this->field) throw new WireException("This inputfield requires that you set valid 'page' and 'field' properties to it.");
+
+		$name = 'media_manager_' . $this->attr('name');
+
+		$media = $this->field->type->getBlankValue($this->page, $this->field);
+
+		// only loop through if we have values
+		if(count($input->{"{$name}"})) {
+			// @note: $idType[0] == pageID; $idType[1] == media type
+			foreach($input->{"{$name}"} as $value) {
+				$idType = explode('_', $value);
+				// @note: skipping InputfieldMM media marked for trashing and ajax template value
+				if(!(int) $idType[0]) continue;
+				// create a new MediaManager and add it to the MediaManagerArray
+				$m = new MediaManager();
+				$m->id = (int) $idType[0];// don't really need to sanitize here as well since done in MediaManager::set()
+				$m->type = (int) $idType[1];// -ditto-
+				$media->add($m);
+			}
+		}
+
+		// if the string values of the processed media are different from the previous,
+		// or if any media have been deleted, then flag this Inputfield as changed
+		// so that it will be automatically saved with the page
+
+		// if things have changed, we take the new values
+		if("$media" != "$this->value") {
+				$this->attr('value', $media);
+				$this->trackChange('value');
+		}
+
+	}
+
+
+}
+

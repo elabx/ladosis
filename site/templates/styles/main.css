@@ -1,0 +1,11 @@
+
+/* blank */
+@import 'https://fonts.googleapis.com/css?family=Oswald';
+
+h1,h2,h3,h4,h5,h6{
+    font-family: 'Oswald', sans-serif;
+}
+
+.tag-list::before{
+    content:"Tags :"
+}

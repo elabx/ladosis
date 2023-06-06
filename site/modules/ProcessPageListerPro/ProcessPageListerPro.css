@@ -1,0 +1,80 @@
+
+#wrap_submit_config,
+#wrap_submit_reset,
+#wrap_submit_refresh {
+	float: right; 
+}
+
+#actions_viewport {
+	margin: 0;
+	padding: 0;
+	border: none; 
+	width: 100%;
+	height: 200px; 
+}
+
+body.ListerProConfig #head_button .dropdown-toggle,
+body.ListerProConfig #head_button ul.nav {
+	/* hide the 'add new' button in config mode */ 
+	display: none !important; 
+}
+
+/**
+ * Editable columns
+ *
+ */
+
+#ProcessListerResults #ProcessListerTable > .AdminDataTable td:last-child {
+	padding-right: 0;
+}
+
+#ProcessListerResults .col_editing {
+	padding: 5px; 
+}
+
+#ProcessListerResults select,
+#ProcessListerResults textarea, 
+#ProcessListerResults input[type=url],
+#ProcessListerResults input[type=email],
+#ProcessListerResults input[type=text] {
+	width: 100%;
+}
+
+#ProcessListerResults td.col_editing .langTabs .ui-tabs-panel {
+}
+
+#ProcessListerResults td.col_editing  > .col_editable > .Inputfields > .Inputfield > .InputfieldContent > .langTabs > .ui-tabs-panel {
+	/* apply only to one first level of Inputfields, in case Inputfield contains other Inputfield wrappers */
+	padding: 5px 0 0 0;
+}
+
+.col_editable .col_editor {
+	display: none;
+}
+.col_editing .col_editor {
+	display: block;
+}
+.col_editing .col_preview {
+	display: none;
+}
+button.save_edits {
+	display: none;
+}
+
+.row_editable_toggle:hover {
+	cursor: pointer;
+}
+
+.AdminDataTableMobile .row_editable_toggle {
+	display: none; 
+}
+
+#ProcessListerResults tr.row_editing:hover td {
+	background: none;
+}
+
+#content #ProcessListerResults .ui-tabs .ui-tabs-nav > li:first-child {
+	/* more condensed language tabs */
+	margin-left: 0;
+}
+

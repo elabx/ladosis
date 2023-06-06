@@ -1,0 +1,369 @@
+/**
+*
+* CSS styles for the Commercial ProcessWire Module Media Manager (Inputfield + Process)
+*
+* Shared styles between Inputfield and Process Media Manager
+* @author Francis Otieno (Kongondo) <kongondo@gmail.com>
+*
+* Copyright (C) 2015 by Francis Otieno
+* Copyright (C) 2015 by ProcessWire
+*/
+
+.mm_hide {display: none !important;}
+
+/** div **/
+div#action_pages::after {content: " ";display: block;}
+div#action_pages {height: 25px; float: none; margin-bottom: 1em;}
+div.mm_actions_wrapper, div#top_pager {width: 100%;}
+div.mm_actions_wrapper {margin-bottom: 0.5em;}
+div.mm_main_wrapper:not(.mm_single_media):not(.mm_modal) div.gridImage__inner {cursor: move}
+div.mm_thumbs_wrapper {min-height: 150px;}
+div.pdf-content {width: 100%; height: 100%}
+div.mm_main_wrapper {position: relative;}
+div.mm_thumbs {position: relative; min-height: 155px;}
+div.mm_upload_anywhere_overlay {display: none; }
+div.mm_thumbs_wrapper.jfu_anywhere_upload_drop_hover div.mm_upload_anywhere_overlay {
+	display: block;
+	background: rgba(214, 221, 232, 0.85);
+	position: absolute;
+	top: 0; left: 0; right: 0; bottom: 0;
+	z-index: 9999;
+}
+
+div.gridImage__tooltip {
+    pointer-events: none;
+    position: absolute;
+    bottom: 100%;
+    padding: 20px;
+    -webkit-filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.1));
+    filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.1));
+    left: 50%;
+    transform: translate(-50%, 0);
+    margin-bottom: 12px;
+    background: #fff;
+    z-index: 110;
+    box-shadow: 0 0 1px rgba(0, 0, 0, 0.25);
+    opacity: 0;
+    transition: opacity .2s 02;
+    /* @kongondo: @TODO: REVISIT? TRYING TO FIT LONGER TEXT IN TOOLTIP */
+    min-width: 300px;
+    text-align: left;
+}
+
+div.gridImage__overflow {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+    background-color: #fefefe;
+    background-image: linear-gradient(45deg, #cbcbcb 25%, transparent 25%, transparent 75%, #cbcbcb 75%, #cbcbcb), linear-gradient(45deg, #cbcbcb 25%, transparent 25%, transparent 75%, #cbcbcb 75%, #cbcbcb);
+	/* background-image: none; *//*@TODO:this is causing some strange styling isses; a ragged left or right border appears*/
+	background-size: 16px 16px;
+	background-position: 0 0, 8px 8px;
+}
+
+div.gridImage__hover {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0.4em;
+}
+
+div.gridImage__inner {position: relative; width: 100%; height: 100%;}
+td.mm_page_thumb div.gridImage__overflow {background-image: none}
+
+/** anchor **/
+div.mm_actions_wrapper a {padding-left: 0.75em;float: right;}
+div.mm_actions_wrapper a.mm_grid_view {padding-left: 1.5em;}
+.gridImage__icon span.mm_media_preview a {color: inherit !important;}
+a.mm_active {opacity: 0.5}
+
+a.gridImage__edit, a.gridImage__locked {
+    position: absolute;
+    display: block;
+    width: 100%;
+    text-align: center;
+    color: white !important;
+    font-size: 1.3em;
+    cursor: move;
+    text-shadow: 0px 0px 7px rgba(62, 185, 152, 0.7);
+    display: none;
+    top: 35%;/* @kongondo for MM */
+}
+/* @kongondo for MM */
+a.gridImage__locked{top: 25%;}
+div.gridImage__inner a.gridImage__locked {font-size: 2.3em; cursor: not-allowed;}
+div.mm_modal a.gridImage__edit, div.mm_single_media a.gridImage__edit {cursor: pointer;}
+.gridImage:hover .gridImage__edit, .gridImage:hover .gridImage__locked {display: block; }
+
+/** i **/
+div.mm_actions_wrapper i.fa {font-size: 1.25em !important;}
+div.mm_actions_wrapper i.fa-fw {margin-right: 0.25em;}
+
+/** image **/
+.mm_thumbs_view_tabular .gridImage__overflow > img {
+	position: static !important;
+	display: block;
+	max-width: 100% !important;
+	height: initial !important;
+	-ms-transform: none;
+	transform: none;
+}
+
+/*@note: for media images only (i.e. don't touch other media since icons) */
+.mm_thumbs_view_tabular .gridImage__overflow > img.mm_image {width: 100%;}
+.InputfieldFileSingle .gridImages .gridImage img, .InputfieldRenderValueMode .gridImages .gridImage img {cursor: zoom-in;}
+.gridImage__overflow > img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transition: transform ease .3s;
+    -ms-transform: translate3d(-50%, -50%, 0);
+	transform: translate3d(-50%, -50%, 0);
+
+}
+
+/** table **/
+div.mm_main_wrapper:not(.mm_modal) table.mm_thumbs_view_tabular tbody tr {cursor: move;}
+div.mm_main_wrapper:not(.mm_modal) table.mm_thumbs_view_tabular td.mm_move {cursor: move; text-align: center;}
+div.mm_modal table.mm_thumbs_view_tabular tr, div.mm_main_wrapper.mm_single_media table.mm_thumbs_view_tabular tr {cursor: default;}
+div.mm_main_wrapper table.mm_thumbs_view_tabular td,
+div.mm_main_wrapper table.mm_thumbs_view_tabular th {
+	vertical-align: top;
+}
+/*@note: padding to match 10px padding on div.mm_page_thumb.gridImage__overflow*/
+div.mm_main_wrapper table.mm_thumbs_view_tabular td:not(.mm_page_thumb),
+div.mm_main_wrapper table.mm_thumbs_view_tabular thead th {
+    padding: 10px;
+}
+table.mm_thumbs_view_tabular:not(.mm_single_media) thead th {text-align: left;}
+table.mm_thumbs_view_tabular:not(.mm_single_media) thead th:first-child {width: 2%; text-align: center;}
+table.mm_thumbs_view_tabular {position: relative;}
+table.mm_thumbs_view_tabular .gridImage:hover .gridImage__tooltip{display: none;}
+.gridImage__tooltip table {margin: 0; border-spacing: 10px 0; border-collapse: separate;}
+.gridImage__tooltip table th {color: black; font-weight: bold; text-align: right; }
+.gridImage__tooltip table th, .gridImage__tooltip table td {border: none !important; background: white !important; }
+
+/** paragraph **/
+div.mm_upload_anywhere_overlay p{position: relative; height: 100%; text-align: center}
+
+/** input **/
+.gridImage__tooltip input {pointer-events: none; }
+.gridImage__icon>input {display: none;}
+.gridImage__icon > input {display: none;}
+
+/** label **/
+label.mm_actions_panel {padding-top: 5px; /* padding-bottom: 10px; */}
+/* @note: was 'gridImage__trash' in original */
+label.gridImage__icon {display: none;}
+label.gridImage__icon {display: none;}
+.gridImage:hover label.gridImage__icon:hover {display: block; color: #e83561; background-color: white;}
+
+/** span **/
+div.mm_main_wrapper table.mm_thumbs_view_tabular p.mm_thumbs_view_tabular_meta > span {font-style: italic; font-weight: bold;}
+div.mm_main_wrapper table.mm_thumbs_view_tabular p.mm_thumbs_view_tabular_meta {margin-bottom: 0.125em; margin-top: 0.125em;}
+div.mm_main_wrapper table.mm_thumbs_view_tabular p.mm_thumbs_view_tabular_meta.title,
+div.mm_main_wrapper table.mm_thumbs_view_tabular p.mm_thumbs_view_tabular_meta.description {
+    margin-bottom: 0.5em
+}
+
+span.mm_image_media_variations {display: block}
+span.mm_status {margin-right: 0.5em;}
+
+div.mm_upload_anywhere_overlay p span {
+	color: #8d939e;
+	font-size: 2em;
+	text-shadow:0 1px rgba(255, 255, 255, 0.17);
+	opacity: 0.85;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+    transform: translate(-50%, -50%);
+}
+.gridImage__edit span {cursor: pointer;}
+
+/** list **/
+ul.mm_message_wrapper {
+	position: fixed;
+    top: 53px;
+    left: 0;
+    z-index: 9999;
+    list-style: none;
+    margin: 0;
+	padding: 0;
+	/* right side notifications */
+	left: auto;
+    right: 0;
+	text-align: right;
+	max-width: 99vw;
+}
+
+li.mm_message {opacity: 0.85;}
+.mm_message_wrapper li .NotificationGhost {
+    display: inline-block;
+    list-style: none;
+    margin: 3px 1em;
+    padding: 0.5em 1em 0.5em 0.5em;
+    border-radius: 5px;
+    /* white-space: nowrap; @TODO? WITH THIS ON; LONG TEXTS CUT OFF!*/
+    width: auto;
+    box-shadow: 0px 0px 3px rgba(0,0,0,0.3);
+    font-weight: normal;
+	line-height: 19px;
+	/* @TODO @kongondo WIP! */
+	overflow-x:hidden;
+	text-overflow: ellipsis;
+}
+
+.NotificationGhosts li .NoticeWarning {background: orange; color: #fff;}
+.NotificationGhosts li .NoticeError {background: crimson; color: #fff;}
+.NotificationGhosts li .NoticeMessage {background: #000; color: #eee;}
+
+/*****************************************************************************************
+ * @note: below and some above, mainly adapted from the section InputfieldImage.css
+*/
+
+ul.gridImages {
+    list-style: none;
+    padding-left: 0;
+    position: relative;
+    margin: 0;
+    margin-right: -.6em;
+    display: block;
+	list-style: none;
+}
+
+.mm_image_page_sorting .gridImage__tooltip {display: none !important; }
+
+li.gridImage {
+    display: inline-block;
+    margin: 0 0.6em 0.6em 0;
+    box-shadow: none; border: 1px solid #d9e1ea;
+    list-style: none;
+}
+.gridImage {
+    position: relative;
+    border-radius: 2px;
+    background: #fff;
+    padding: 0.4em;
+    vertical-align: top;
+}
+.gridImage:not(td.mm_page_thumb) {box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);}
+.gridImage.ui-sortable-placeholder {
+    display: inline-block;
+    border-radius: 2px;
+    border: 1px dashed #ccc;
+    padding: 0.4em;
+    visibility: visible !important;
+    vertical-align: top;
+    background-color: transparent;
+	box-shadow: none;
+}
+.gridImage.ui-sortable-placeholder::after {content: " "; display: block;}
+.gridImage__tooltip:after {
+    top: 100%;
+    left: 50%;
+    border: solid transparent;
+    content: " ";
+    height: 0;
+    width: 0;
+    position: absolute;
+    pointer-events: none;
+    border-color: rgba(255, 255, 255, 0);
+    border-top-color: #fff;
+    border-width: 10px;
+    margin-left: -10px;
+}
+.gridImage:hover .gridImage__tooltip {display: block; opacity: 1; transition: opacity .2s 1s; }
+.InputfieldImageSorting .gridImage__tooltip {display: none !important; }
+.gridImage__icon {
+    position: absolute;
+    background: white;
+    padding: .2em .6em;
+    color: #aaa;
+    z-index: 2;
+    cursor: pointer;
+}
+.gridImage__edit:hover {color: white; }
+.gridImage.ui-sortable-placeholder {
+    display: inline-block;
+    border-radius: 2px;
+    border: 1px dashed #ccc;
+    padding: 0.4em;
+    visibility: visible !important;
+    vertical-align: top;
+    background-color: transparent;
+    box-shadow: none;
+}
+.gridImage.ui-sortable-placeholder::after {content: " "; display: block;}
+.gridImage:hover .gridImage__inner {background: rgba(62, 185, 152, 0.7);}
+.gridImage__icon {
+	position: absolute;
+	background: white;
+	padding: .2em .6em;
+	color: #aaa;
+	z-index: 2;
+	cursor: pointer;
+}
+.gridImage__icon--single {display: block !important; position: static;}
+.gridImage:hover .gridImage__icon {display: block;}
+.ImageOuter.mm_in_field, td.mm_page_thumb.mm_in_field {background-color: #3eb998; background: rgba(62, 185, 152, 0.7);}
+.gridImage--select {background-color: #e83561 !important;}
+.gridImage--select .gridImage__icon {background-color: #e83561; color: white; display: block;}
+.gridImage--select .gridImage__icon:hover {background-color: #e83561;}
+.gridImage--select:hover .gridImage__edit {display: none;}
+.gridImage--select:hover .gridImage__icon:hover {background-color: #e83561;}
+.gridImage--select:hover .gridImage__inner {background: rgba(232, 53, 97, 0.3);}
+.mm_thumbs_view_tabular .gridImage:before, .mm_thumbs_view_tabular .gridImage:after {
+	content: "";
+	display: table;
+	border-collapse: collapse;
+}
+.mm_thumbs_view_tabular .gridImage:after {clear: both;}
+.mm_thumbs_view_tabular .gridImage__overflow {
+	position: relative;
+	top: 0;
+	left: 0;
+	display: block;
+	width: 23%;
+	overflow: visible;
+	padding: 10px;
+}
+
+/***** blueimp gallery *****/
+div.blueimp-gallery p.caption ul.mm_media_stats {
+	list-style-type: none;
+	background: rgba(0, 0, 0, 0.7);
+	background: rgba(25, 25, 25, 0.7);
+	color: #A6A6A6;
+	padding: 1em 2em;
+}
+div.blueimp-gallery p.caption ul.mm_media_stats:hover {background: rgba(0, 0, 0, 0.8); color: rgb(224, 214, 214);}
+div.blueimp-gallery p.caption {position: absolute; top: 30px; color: #fff; }
+div.blueimp-gallery-controls p.caption {display: block; }
+div.blueimp-gallery > .description.mm_hide{display: none;}
+div.blueimp-gallery p.caption {width: 100%;}
+div.blueimp-gallery p.caption ul.mm_media_stats li.mm_meta span {font-weight: bold}
+div.blueimp-gallery p.caption ul.mm_media_stats li.mm_media_description,
+div.blueimp-gallery p.caption ul.mm_media_stats li.mm_media_tags {margin-bottom: 1em;}
+div.media_stats {background: rgba(0, 0, 0, 0.7); color: #A6A6A6;}
+div.blueimp-gallery h3.title {padding: 0 0.75em;}
+div.blueimp-gallery > .slides > .slide > div.audio-content {
+    top: 0 !important;
+    left: 0 !important;
+    min-height: 500px;
+    background-image: url("assets/audio_bg.jpg");
+    background-repeat: no-repeat;
+    background-size: 100%;
+}
+div.audio-content audio {
+    width: 80%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translateY(-50%);
+    transform: translateX(-50%);
+    min-height: 50px;
+}

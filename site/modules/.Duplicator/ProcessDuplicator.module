@@ -1,0 +1,173 @@
+<?php
+
+require_once(wire('config')->paths->Duplicator . 'Classes/define.php');
+
+class ProcessDuplicator extends Process
+{
+	protected $dupmod = null;
+
+	public static function getModuleInfo()
+	{
+		return array(
+			'title' => 'Duplicator Manager',
+			'summary' => 'Process module for Duplicator.',
+			'version' => DUP_PROCESS_VERSION,
+			'author' => 'flydev',
+			'icon' => 'clone',
+			'href' => 'http://modules.processwire.com/',
+			'permission' => 'duplicator',
+			'permissions' => array(
+				'duplicator' => 'Run the Duplicator module'
+			),
+			'page' => array(
+				'name' => 'duplicator',
+				'parent' => 'setup',
+				'title' => 'Duplicator'
+			)
+		);
+	}
+
+	public function init()
+	{
+		parent::init(); // always remember to call the parent init
+
+
+		$this->config->styles->add($this->config->urls->{$this->className} . "{$this->className}.css");
+		$this->config->scripts->add($this->config->urls->{$this->className} . "{$this->className}.js");
+
+
+		$this->dupmod = $this->modules->get(DUP_APPLICATION_NAME);
+
+	}
+
+
+	public function ___execute()
+	{
+		$out = '';
+
+		$out .= $this->___renderLog();
+
+		$action = wire('input')->get->action;
+		switch ($action) {
+			case 'get_packages':
+			default:
+				$out .= $this->___renderGetPackages();
+				break;
+		}
+
+
+		return $out;
+	}
+
+	public function ___executeNewPackage()
+	{
+		$out = '';
+
+		if ($this->input->urlSegment2) throw new Wire404Exception();
+
+		switch ($this->input->urlSegment1) {
+			case 'newPackage':
+				$out .= 'No content';
+				break;
+
+			case 'new':
+				$out .= 'New';
+				break;
+
+			default:
+				$out .= 'default';
+
+		}
+
+		return $out;
+	}
+
+
+	public function ___renderLog()
+	{
+		$out = '';
+
+
+		$fields = new \ProcessWire\InputfieldWrapper();
+
+		$fs = $this->modules->get("InputfieldFieldset");
+		$fs->label = __("Last logs");
+		$fs->icon = 'history';
+		$fs->collapsed = false;
+
+		$field = $this->modules->get('InputfieldTextarea');
+		$field->attr('id', 'InputfieldLoglines');
+		$loglines = '';
+		$key   = $this->dupmod->lastPackageName;
+		$datelog = basename($key, DUP_PACKAGE_EXTENSION);
+		$parts = explode('-', $datelog);
+		array_pop($parts);
+		$datelog = implode('-', $parts);
+		$ts = date_create_from_format(DUP_TIMESTAMP_FORMAT, $datelog);
+		if($ts) {
+			$from = array('from' => $ts->getTimestamp());
+			foreach (wire('log')->getEntries(DUP_LOG_FILENAME, $from) as $entry) {
+				$loglines .= $entry['date'] . ':  ' . $entry['text'] . "\n";
+			}
+		} else {
+			foreach (wire('log')->getEntries(DUP_LOG_FILENAME) as $entry) {
+				$loglines .= $entry['date'] . ':  ' . $entry['text'] . "\n";
+			}
+		}
+
+		$field->value = $loglines;
+
+		$fs->add($field);
+
+		$fields->append($fs);
+
+		$out .= $fields->render();
+
+		return $out;
+	}
+
+	public function ___renderGetPackages()
+	{
+		$out = '';
+
+		$table = wire('modules')->get("MarkupAdminDataTable");
+		$table->headerRow( array("Package Name", "Created", "Size") );
+		$table->setSortable(true);
+		$datas = DUP_Util::getPackagesDetails($this->dupmod->localPath, DUP_PACKAGE_EXTENSION);
+		$numFiles = 0;
+		foreach ($datas as $data) {
+			$table->row($data);
+			$numFiles++;
+		}
+		$out .= "<br>";
+
+		if(!$numFiles) $out .= "<h2>" . $this->_('No package found.') . "</h2>";
+		$out .= $table->render();
+
+		$href = $this->config->urls->admin . 'setup/' . DUP_APPLICATION_NAME . '/?action=backup_now';
+		$f = $this->modules->get('InputfieldButton');
+		$f->attr('id+name', 'newPackage');
+		$f->value = $this->_('New Package');
+		$f->icon = 'clone';
+		$f->attr('data-action', $href);
+		$f->addClass('head_button_clone');
+		$out .= $f->render();
+
+
+		return $out;
+	}
+
+	public function ___install()
+	{
+		parent::___install();
+	}
+
+	public function ___uninstall()
+	{
+		parent::___uninstall();
+	}
+
+
+
+}
+

@@ -1,0 +1,581 @@
+/**
+*
+* CSS styles for the Commercial ProcessWire Module Media Manager (Process)
+*
+* @author Francis Otieno (Kongondo) <kongondo@gmail.com>
+*
+* Copyright (C) 2015 by Francis Otieno
+*
+*/
+
+@import url(pocketgrid.css);/* pocket grid MIT Licence */
+
+
+/** html **/
+/*## Prevent "jump" on shorter pages ##*/
+html {overflow-y:scroll;}
+
+
+/** div **/
+div#insert_wrapper {width: 100%; width: 40%; overflow: auto;}
+div#notes {width: 70%; float: left; margin-bottom: 0.75em;}
+div#save_pages {margin-bottom: 0.75em; float: right; width: 40%;}
+
+div.media {position: relative; line-height: 0.88em;}
+div.original, div#media_message {position: relative;}
+div#mm_top_panel {padding-top:1em;}
+div.top_panel {padding-bottom: 3em;}
+/*div.top_panel_Reno {padding-bottom: 0;}*/
+div.top_panel_Reno {padding-bottom: 0.6em;}
+div#mm_top_panel {display: none;}/*ajax double output*/
+div#mm_menu {width: 60%;}
+div#mm_actions {width: 40%;}
+div#mm_actions.empty {width: 100%;}
+div.mm_exec {min-height: 600px;}
+
+div#mm_drag_and_drop_area {
+	height: 100px;
+	background-color: #F3F3F3;
+	background-color: #D9D9D9;
+	text-align: center;
+	color: #FFF;
+}
+
+div#mm_drag_and_drop_area:hover {background-color: #F2FAFF; color: #000;}
+div#mm_scan {margin: 2em 0;}
+
+div#bottom_pager {
+	margin: 1.25em 0;
+	height: 3.125em;
+	float: left;
+}
+
+div.media_edit div.media {width: 25%;}
+div.original:hover div.media_preview,
+div.original:hover div.media_image_variation,
+div.variation:hover div.media_image_variation_crop {
+	display: block;
+}
+
+div.media_edit {word-wrap: break-word;}
+div.selected img {padding: 10px; background-color: #f2fecd;}
+
+/*## Thumbs and Preview pane wrappers (2-column layout) ##*/
+div#media_grid_view, div#media_large_view  {width: 50%;}
+div#media_large_view {min-height: 500px;position: relative;}
+div#media_large_view div.hidden{
+	visibility: hidden;
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+
+/*## Large Media Preview Panel ##*/
+div.media_large_audio {
+	min-height: 500px;
+	background-image: url("assets/audio_bg.jpg");
+	background-repeat: no-repeat;
+}
+
+div.media_large_video {
+	background-color: #010101;
+	min-height: 500px;
+	background-image: url("assets/video_bg.jpg");
+	background-repeat: no-repeat;
+	margin: 0;
+}
+
+div.media_large_document {
+	background-color: #010101;
+	min-height: 500px;
+	background-image: url("assets/document_bg.jpg");
+	background-repeat: no-repeat;
+	margin: 0;
+}
+
+div.media_stats {
+	min-height: 175px;
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	padding: 0 1em;
+	color: #858789;
+}
+
+div.media_image_variation_crop, div.media_image_zoom {
+	position: absolute;
+	top: 0;
+	left: 0;
+	margin-top: 2px;
+}
+
+/*## move the variations zoom icon div to the right of variations crop icon ##*/
+div.accordion div.media_image_zoom {margin: 0 0 0 15px;}
+div.accordion div.media_image_variation_crop {margin-top: 0;}
+
+div.media_stats:hover {background: rgba(0, 0, 0, 0.7); color: #A6A6A6;}
+
+div.media_actions {
+	position: absolute;
+	top: 0;
+	right: 0;
+	z-index: 3;
+}
+
+div.media_panel {
+	display:none;
+	position: absolute;
+	top: 0;
+	width:100%;
+	right:0%;
+	height: 100%;
+	min-height: 100%;
+	z-index: 3;
+	margin: 0;
+	overflow: visible !important;
+	background: rgba(0, 0, 0, 0.5);
+}
+
+div.media_edit {
+	display:none;
+	color:white;
+	padding:1.563em 3.125em;
+	background: rgba(0, 0, 0, 0.5);
+}
+
+div.mm_render_audio_player, div.mm_render_video_player {
+	background: rgba(0, 0, 0, 0.5);
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	width: 100%;
+}
+
+div.mm_render_video_player {bottom: -7px; background: none;}
+div.mm_render_audio_player:hover {background: rgba(0, 0, 0, 0.7); color: #A6A6A6;}
+
+div#overlay {
+	background-color: #333;
+	opacity: 0.8;
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	z-index: 100;
+	height: 100%;
+	width: 100%;
+	overflow: hidden;
+	background-position: center;
+}
+/*## cleanup page ##*/
+div#components div.block {width: 25%;}
+
+div#components:after {/* clear blog-style div's float */
+	content: '\0020';
+	visibility: hidden;
+	display: block;
+	height: 0;
+	clear: both;
+}
+
+div#media_wrapper {position: relative;}
+div#media_wrapper.hide, div#mm_actions.hide, div#ProcessListerResults.hide {display: none !important;}
+div#mm_tags_wrapper {margin-top: 1.5em;	display: none; width: 100%;}
+
+/* list-view */
+div.hide_view + div#media_large_view {float: right; z-index: 5;}
+div#media_grid_view.hide_view + div#media_large_view div.fixed {
+	position: fixed;
+	top: 0;
+	left: 56%;
+	margin-right: 8px;
+	margin-top: 1.5em;
+	width: 41.66%;
+}
+
+div#media_list_view {width: 50%;}
+div#media_view_switcher_sort {margin-bottom: 0.65em; padding-bottom: 1em; border-bottom: 1px dotted #ccc;}
+div.fixed ~ div#bottom_pager {padding-top: 3.25em;}
+
+/** headers **/
+h2.results_headline {float: left;}
+div.media_large h2 {color: white; width: 100%; margin: 0.25em 0;}
+div#insert_wrapper h3{margin: 0;}
+div#media_controllers h2.results_headline, {font-size: 1.15em;}
+div#mm_scan h3, div#mm_upload_links h3, div#mm_drag_and_drop h3 {font-weight: bold;}
+div.accordion h3.media_variations {margin: 0.125em; padding: 0 0.35em;}
+h3.media_variations .ui-accordion-header-icon {left: 0.8em !important; margin-left: 0.75em;}
+h3.media_variations_title {margin: 1em 0 0.6em;}
+
+div#mm_drag_and_drop h3#media_drop_here {
+	font-weight: bold;
+	display: inline-block;
+	vertical-align: middle;
+	line-height: normal;
+	font-size: 1.25em;
+}
+
+/** paragraph **/
+div#insert_wrapper p{margin: 0.125em 0 0;}
+
+p#message {
+	display: none;
+	border: 1px solid white;
+	border-radius: 5px;
+	text-align: center;
+	box-shadow: 0 0 7px black;
+	position: absolute;
+	position: fixed;
+	z-index: 9999;
+	min-width: 200px;
+	height: 35px;
+	padding: 0;
+	margin: 0;
+	padding-top: 0.25em;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	color: white;
+}
+
+p.NoticeMessage {background-color: #61b832;}
+div.media_stats p {width: 100%;}
+
+/*## cleanup page ##*/
+div#components div#warning p {color: #c5ff8a; background-color: #000; padding: 0.5em; font-size: 1.15em;}
+p#mm_filter_profiles_del_confirm_text {display: none; margin-top: 1em;}
+
+/** form **/
+form#mm_cleanup, form#settings {margin-top: 1.5em;}
+
+/** input **/
+/*## Actions Select ##*/
+select#mm_action_select {float: right; margin-right: 0.75em; width: 150px;}
+div.media_edit textarea, div.media_edit input[type=text] {width: 100%; margin: 1em 0;}
+div.media_edit textarea {height: 100px;}
+
+table.mm_settings input {width: 100%}
+table.media_variations textarea, table.media_variations input[type=text] {height: 75px; margin: 0.25em 0; font-size: 90%}
+
+div.media input[type=checkbox] {display: none;}
+
+input[type=checkbox]#mm_add_to_media_library_publish {
+	float: right;
+	width: 20px;
+	height: 20px;
+	vertical-align: bottom;
+	padding: 0;
+	margin: 0;
+	margin-left: 0.35em;
+	position: relative;
+	*overflow: hidden;
+}
+
+div.media_edit input[type=checkbox], input[type=checkbox]#scan_publish, p#mm_tag_mode_wrapper input[type=checkbox] {
+	width: 20px;
+	height: 20px;
+	vertical-align: bottom;
+	padding: 0;
+	margin: 0;
+	margin-left: 0.35em;
+	position: relative;
+	top: -3px;
+	*overflow: hidden;
+}
+
+/* @note: overriding some of the above */
+p#mm_tag_mode_wrapper input[type=checkbox] {float: none; width: 15px; height: 15px; margin: 0 0.35em 0 0; top: -5px;}
+
+/*## cleanup page ##*/
+input#remove_tpl_files {margin-left: 1em; position: relative; top: 0.3em;}
+input[type=checkbox]#media_live_sort_order {margin-left: 0.75em; margin-right: 0.25em;}
+
+/** label **/
+div#mm_scan label {font-size: 1.15em;}
+div.media_edit label {font-size: 1.1em;display: block;padding: 0;}
+div.media_edit label.media_status, label#scan_publish_label {display: inline-block; padding-right: 15px; margin-right: 1em;}
+label#scan_publish_label {margin-left: 0.75em;}
+
+/*## cleanup page ##*/
+label#remove_tf {margin: 0.75em 0 0 0.25em;display: inline-block; vertical-align: top;}
+
+p#mm_tag_mode_wrapper label {padding-right: 15px;}
+label#media_live_sort_label {margin-left: 1em; margin-right: 0.25em; }
+label#media_live_sort_label, label#media_live_sort_order_label {font-size: 95%; display: inline-block; vertical-align: top;}
+label#media_live_sort_order_label.hide {display: none;}
+p#mm_filter_profiles_del_confirm_text label {display:inline;}
+
+/** button **/
+button:focus {outline:0;}
+
+/*## Actions 'Apply' Button ##*/
+button#mm_action_btn,
+button#mm_add_btn,/* save, delete variations, delete buttons at the top */
+button.mm_edit {
+	display:inline-block;
+	width: auto;
+	max-width: 100%;
+	border: none !important;
+	border-radius: 3px !important;
+	-moz-border-radius: 3px !important;
+	-webkit-border-radius: 3px !important;
+	float: right !important;
+	margin: 0;
+	font-size: 0.875em;
+}
+
+button.mm_edit {float: left;} /* save, delete variations, delete buttons at the bottom */
+button#mm_add_to_media_library_btn {float: right; display: inline-block;}
+
+/**
+ * Don't show the save buttons when on the Add and Help Tabs *
+ * This works because WireTabs adds class names equal to the ID of the selected tab to the tab target container
+ *
+ */
+#MediaManagerTabsAdd button#mm_settings_btn,
+#MediaManagerTabsAdd button#mm_settings_btn,
+#MediaManagerTabsAdd div#head_button button#mm_settings_btn_copy,
+#MediaManagerTabsHelp div#head_button button#mm_settings_btn_copy {
+	display: none !important;
+	visibility: none;
+}
+
+/* @note: this is actually in JqueryFileUpload. In the modals /media-manager/rte/settings and /media-manager/rte/upload, the 'save' and 'start uploads' buttons respectively are getting a display:none applied to it by some script. We use this rule to override that*/
+button#start_upload, button#mm_settings_btn {display: initial !important;}
+
+/** i **/
+#page_fields_spinner i {position: absolute;top: 20px; left: 50%;}
+div#overlay span i.fa-spinner {font-size: 3em!important; color:#ad2f41;}
+
+div.media_image_variation_crop a.media_image_variation_crop i,
+div.media_image_zoom a.media_image_zoom i {
+	visibility: hidden;
+}
+
+img.image:hover + div.media_image_variation_crop a.media_image_variation_crop i,
+div.media_image_variation_crop a.media_image_variation_crop:hover i,
+img.image:hover + div.media_image_zoom a.media_image_zoom i,
+img.variation:hover + div.media_image_variation_crop + div.media_image_zoom a.media_image_zoom i,
+div.media_image_zoom a.media_image_zoom:hover i {
+	visibility: visible;
+}
+
+div.original:hover i.fa-eye, div.original:hover i.fa-files-o {display: inline-block;}
+
+/** image **/
+div.media img, table.media_variations img.image {
+	width: auto;
+	height: 75px;
+	-moz-border-radius: 3px;
+	-webkit-border-radius: 3px;
+	border-radius: 3px;
+	/*margin: 0 auto;*/
+}
+/*## any 4:3 ratio (e.g. here, 135x110) will do, least being 100*75. Note: can be overriden by inline styles ##*/
+div.media img.image, div.media_variations_wrapper img.image, table.media_variations img.image {width: 100px !important;}
+div.media img:hover {cursor: pointer; opacity: 0.7;}
+div.media img.in_field {border: 1px dotted #749CBE;opacity: 0.7;}
+div.media img.highlighted {border: 2px solid #B50E60;} /*PW pink*/
+div.media img.highlighted.rte {border: none;} /*removed for RTE mode*/
+table.media_variations img.image {border-radius: 0; width: 100px !important;}
+/*## media_large hide ##*/
+div.hidden img {visibility: hidden;}
+div.media_edit div.media img {margin: 0;}
+div#media_large_view img.media_image_large {width: 100%;height: auto;}
+
+/** span **/
+div.media span.thumb-meta {
+	margin: 0;
+	padding: 0.5em 0;
+	display: block;
+	color: #315C80;
+	font-size: 0.77em;
+}
+
+div.media img.in_field + input[type=checkbox] + span.thumb-meta {color:#749CBE;}
+span#page_fields_spinner {font-size: 1.250em; display: none;}
+div.media_stats p span, div.accordion span:first-child, span.mm_settings  {font-weight: bold;}
+input[type=checkbox]#mm_add_to_media_library_publish + span {float: right; margin-left: 0.5em;}
+input[type=checkbox]#scan_confirm + span {margin-left: 0.5em;}
+p#message span {font-style: italic;}
+/* @note: don't need to display the media title in this case since we can already see it */
+div.mm_render_audio_player span, div.mm_render_video_player span {display: none;}
+span.media_rte_link {display: none;}/*hidden anchors parent in rte mode; needed by JS*/
+span.close {
+	position:absolute;
+	right:15px;
+	top:10px;
+	cursor:pointer;
+}
+
+div.media_actions span {float: right;}
+div#overlay span {position: absolute;top: 50%; left: 50%; color: #ad2f41; font-size: 1.25em; text-align: center;}
+span#mm_action_tags_label {font-weight: bold;}
+
+p#mm_tag_mode_wrapper span:first-child {margin-right: 0.5em;}
+
+div.hide_view, table#list_view div.media span.thumb-meta {display: none !important;}
+span.list_view_mini_titles {font-style: italic; font-weight: bold;}
+table#list_view span.thumb-meta {display: block;}
+
+/** list **/
+.content .MarkupPagerNav {list-style: outside none none; margin: 0;padding: 0;}
+
+ul.mm_menu {
+	width:100%;
+	padding:0;
+	margin:0;
+	list-style-type:none;
+}
+
+ul.mm_menu li {display: table-cell; width: 16.6666666%;  /* (100 / numItems)% */ text-align: center;}
+li.Inputfield_mm_filter_settings_save_btn,
+li.Inputfield_mm_filter_settings_save_view_btn,
+li.Inputfield_mm_filter_profiles_go_btn,
+li.Inputfield_mm_edit_filter_config_btn  {
+	display: inline-block !important;
+}
+ul.mm_menu > li {display:inline;}
+
+/*## Variations Accordion ##*/
+div.accordion ul.media_variations {
+	width:100%;
+	padding:0;
+	margin:0;
+	list-style-type:none;
+}
+
+div.accordion ul.media_variations li {
+	display: table-cell;
+	float: left;
+	padding: 0 1em;
+	font-size: 80%;
+}
+
+div.accordion ul.media_variations li:nth-child(1) { width: 20%;}
+div.accordion ul.media_variations li:nth-child(2) { width: 30%;}
+div.accordion ul.media_variations li:nth-child(3) { width: 50%;}
+div.accordion ul.media_variations > li {display:inline;}
+
+li#mm_upload_settings ol li {margin-top: 0; margin-bottom: 0;}
+
+/*## cleanup page ##*/
+div#components div.block ol li {margin: 0 0 0 20px; padding: 0;}
+
+/** anchor **/
+span.sel_all a {display: inline-block; font-size: 0.9em;}
+div.media span.unpublished a, table#list_view span.unpublished a {text-decoration: line-through;}
+div.media span.locked a, table#list_view span.locked a {color: #6b6d5f;}
+a.rte, a#media_rte_link, a.media_rte_link {display: none;}/*hidden anchors in rte mode; needed by JS*/
+
+a.mm_menu_item {
+	float:left;
+	width:6em;
+	text-decoration:none;
+	color:inherit;
+	padding:0.2em 0.6em;
+	font-size: 1.15em;
+	font-weight: bold;
+	margin-left: -20px;
+}
+
+a.mm:hover {color:#A6A6A6;}
+a.mm_on {color: #f64704;}
+a.media_locked:hover, a.media_unpublished:hover {cursor: default;}
+div.media_edit a.media_image_variations_edit {font-size: 80%; background: rgba(0, 0, 0, 0.5);}
+a.media_panel_view.selected {color: #FFF !important; background-color: #000 !important;}
+div.media_actions a.media_image_crop{visibility: hidden;}
+
+div.media_actions a.media_edit, div.media_image_variation_crop a.media_image_variation_crop, div.media_image_zoom a.media_image_zoom {
+	width: 15px;
+	height: 15px;
+	color: #fa5400;
+	background-color: rgba(0, 0, 0, 0.5);
+	padding: 2px;
+	margin: 0;
+	border-radius: 0;
+}
+
+/*## apart from padding, to help with some flickering issues when hovering on the icon in case it is the div that was hidden. Instead, we hide the i ##*/
+div.media_image_variation_crop a.media_image_variation_crop, div.media_image_zoom a.media_image_zoom {padding: 0; background-color: transparent;}
+
+div.media_image_variation_crop a.media_image_variation_crop:hover,
+img.image:hover + div.media_image_variation_crop a.media_image_variation_crop,
+div.media_image_zoom a.media_image_zoom:hover,
+img.image:hover + div.media_image_variation_crop + div.media_image_zoom a.media_image_zoom {
+	background-color: rgba(0, 0, 0, 0.5);
+}
+
+/*## the fa-crop icon in the large image preview panel (top-right) ##*/
+img.media_image_large:hover + div.media_stats > div.media_actions a.media_image_crop,
+div.media_stats:hover div.media_actions a.media_image_crop {
+	visibility: visible;
+}
+
+a.views {padding: 0 4px;}
+table#mm_filter_profiles_list tr.ui-state-error a {color: #fff;}
+
+/** table **/
+table.mm_settings, table.media_variations{width: 100%;}
+table.mm_settings th:nth-child(1) {width:14%;}
+table.mm_settings th:nth-child(2) {width:3%;}
+table.mm_settings th:nth-child(3) {width:4%;}
+table.mm_settings th:nth-child(4) {width:19%;}
+table.mm_settings th:nth-child(5) {width:60%;}
+
+table.media_variations th:nth-child(1) {width:10%;}/* variation thumb */
+table.media_variations th:nth-child(2) {width:60%;}/* variation description */
+table.media_variations th:nth-child(3) {width:30%;}/* variation tags */
+table.media_variations td {padding: 0 0.25em;}
+/*@note: table uses classes: AdminDataTable AdminDataList so lots of styles covered there, even width but adding below just in case things change */
+table#list_view {font-size: 0.9em; width: 100%;}
+table#list_view td:nth-child(2) {padding-left: 2em;}
+
+/*## filter profiles ##*/
+table#mm_filter_profiles_list {width: 100%;}
+table#mm_filter_profiles_list th {padding-bottom: 0; font-weight: bold; font-size: 1em;}
+table#mm_filter_profiles_list tr:not(.mm_filter_profile_TBD):hover td {background: #EEE;}
+table#mm_filter_profiles_list th, table#mm_filter_profiles_list td {padding: 6px 2px; border-bottom: 1px solid #DDD;}
+table#mm_filter_profiles_list th, table#mm_filter_profiles_listtd {padding: 6px 2px; border-bottom: 1px solid #DDD;}
+table#mm_filter_profiles_list th.mm_filter_profile_del {width: 5%; padding-right: 0;}
+table#mm_filter_profiles_list a.mm_filter_profile_del {width: 1.5em; display: block;}
+table#mm_filter_profiles_list .mm_filter_profile_TBD td input {text-decoration: line-through;}
+tr a.mm_filter_profile_del {padding-left: 15px;}
+
+/** small **/
+small.media_locked {
+	color: red;
+	color: #fa5400;
+	font-size: 80%;
+	margin-left: 0.75em;
+	background: rgba(0, 0, 0, 0.5);
+	padding: 0 0.25em;
+}
+
+/** video **/
+div.mm_render_video_player video {width:50%    !important; height: auto   !important; margin: 0 auto !important;}
+
+/** clear floats **/
+.clearfix:after {/* clear float */
+	content: '\0020';
+	visibility: hidden;
+	display: block;
+	height: 0;
+	clear: both;
+}
+
+/** responsive **/
+@media only screen and (min-device-width : 1440px) and (max-device-width : 1920px) {
+	div.media {width: 25%;}
+	/*div.media.rte {width: 12.5%;}*//* if in RTE mode, there is no preview panel, so we can have more thumbs per line*/
+}
+
+@media only screen and (min-device-width : 480px) and (max-device-width : 1440px) {
+	div.media {width: 50%;}
+}
+
+@media (min-width: 1920px) {
+	div.media {width: 20%;}
+	div.media.Reno {width: 16.66%;}
+}
