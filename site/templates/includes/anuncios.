@@ -1,9 +1,0 @@
-<?php $type = $pages->get("name=lateral-articulos-y-secciones") ?>
-<?php foreach( $pages->get("name=publicidad")->publicidad_repeater as $anuncio):  ?>
-  <?php if($anuncio->publicidad_ubicacion == $type): ?>
-    <a class="uk-display-block uk-margin-top" href="<?php echo $anuncio->publicidad_url ?>">
-      <img class=""
-	   src="<?php echo $anuncio->publicidad_img->url ?>">
-    </a>
-  <?php endif ?>
-<?php endforeach ?>
