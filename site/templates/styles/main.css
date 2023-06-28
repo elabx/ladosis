@@ -24,3 +24,7 @@ h1,h2,h3,h4,h5,h6{
 .top-logo img{
     width:100%;
 }
+
+#titulo {
+    color: #43d08a;
+}

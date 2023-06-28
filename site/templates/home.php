@@ -128,7 +128,7 @@ $configuracion = $pages->get("name=configuracion");
 						</div>
 
 						<div class="uk-card-body">
-							<a href="<?php echo $article->url ?>"><h3
+							<a href="<?php echo $article->url ?>"><h3 id="titulo"
 									class="uk-card-title"><?php echo $article->title ?></h3></a>
 
 							<p>
@@ -153,35 +153,74 @@ $configuracion = $pages->get("name=configuracion");
 	</div>
 
 	<div class="uk-container uk-margin-top">
-		<div class="uk-child-width-1-5@m uk-grid-match "uk-grid>
 
-			<?php foreach ($configuracion->featured as $article): ?>
-				<div>
-					<div class="uk-card uk-card-default">
-						<div class="uk-card-media-top uk-cover-container uk-height-medium">
-							<img src="<?php echo $article->article_images->first()->media->size(300, 150)->url; ?>"
-								 alt="" uk-cover>
-						</div>
+		<div class="uk-slider-container" uk-slider>
+			<div class="uk-position-relative uk-visible-toggle uk-light" tabindex="-1" >
+				<ul class="uk-slider-items uk-child-width-1-4@m uk-grid-match uk-grid">
 
-						<div class="uk-card-body">
-							<a href="<?php echo $article->url ?>"><h3
-									class="uk-card-title"><?php echo $article->title ?></h3></a>
+					<?php foreach ($configuracion->featured as $article): ?>
+						<li>
 
-							<p>
-								<?= $sanitizer->truncate($article->body, array(
-									'type' => 'punctuation',
-									'maxLength' => 150,
-									'visible' => true,
-									'more' => '...'
-								)); ?>
-							</p>
-							<a class="read-more uk-flex uk-flex-right" href="<?php echo $article->url ?>">Leer más &#10161;</a>
-						</div>
-					</div>
-				</div>
-			<?php endforeach; ?>
+							<div class="uk-card uk-card-default uk-card-small">
+								<div class="uk-card-media-top uk-cover-container uk-height-small">
+									<img src="<?php echo $article->article_images->first()->media->size(300, 150)->url; ?>"
+										 alt="" uk-cover>
+								</div>
+
+								<div class="uk-card-body">
+									<a href="<?php echo $article->url ?>"><h3 id="titulo"
+																			  class="uk-card-title"><?php echo $article->title ?></h3></a>
+
+									<a class="read-more uk-flex uk-flex-right" href="<?php echo $article->url ?>">Leer más &#10161;</a>
+								</div>
+							</div>
+
+						</li>
+					<?php endforeach; ?>
+				</ul>
+				<a class="uk-position-center-left uk-position-small uk-hidden-hover" href="#" uk-slidenav-previous uk-slider-item="previous"></a>
+				<a class="uk-position-center-right uk-position-small uk-hidden-hover" href="#" uk-slidenav-next uk-slider-item="next"></a>
+			</div>
 		</div>
+
 	</div>
+
+
+
+
+
+
+
+<!--	<div class="uk-container uk-margin-top">-->
+<!--		<div class="uk-child-width-1-4@m uk-grid-match "uk-grid>-->
+<!---->
+<!--			--><?php //foreach ($configuracion->featured as $article): ?>
+<!--				<div>-->
+<!--					<div class="uk-card uk-card-default uk-card-small">-->
+<!--						<div class="uk-card-media-top uk-cover-container uk-height-small">-->
+<!--							<img src="--><?php //echo $article->article_images->first()->media->size(300, 150)->url; ?><!--"-->
+<!--								 alt="" uk-cover>-->
+<!--						</div>-->
+<!---->
+<!--						<div class="uk-card-body">-->
+<!--							<a href="--><?php //echo $article->url ?><!--"><h3-->
+<!--									class="uk-card-title">--><?php //echo $article->title ?><!--</h3></a>-->
+<!---->
+<!--							<p class="uk-text-small">-->
+<!--								--><?php //= $sanitizer->truncate($article->body, array(
+//									'type' => 'punctuation',
+//									'maxLength' => 150,
+//									'visible' => true,
+//									'more' => '...'
+//								)); ?>
+<!--							</p>-->
+<!--							<a class="read-more uk-flex uk-flex-right" href="--><?php //echo $article->url ?><!--">Leer más &#10161;</a>-->
+<!--						</div>-->
+<!--					</div>-->
+<!--				</div>-->
+<!--			--><?php //endforeach; ?>
+<!--		</div>-->
+<!--	</div>-->
 
 </region>
 
