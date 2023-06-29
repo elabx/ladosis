@@ -1,9 +1,16 @@
 
 /* blank */
 @import 'https://fonts.googleapis.com/css?family=Oswald';
+@import url('https://fonts.googleapis.com/css?family=Merriweather:300,300i,400,400i,700,700i,900,900i|Karla:400,400i,700,700i');
 
 h1,h2,h3,h4,h5,h6{
     font-family: 'Oswald', sans-serif;
+}
+
+p, ul, li{
+    font-family:'Karla', serif;
+    font-size:16px;
+    line-height: 1.35em;
 }
 
 .tag-list::before{
@@ -25,6 +32,12 @@ h1,h2,h3,h4,h5,h6{
     width:100%;
 }
 
-#titulo {
+.titulo {
     color: #43d08a;
+}
+
+.article-published-date{
+    font-size:14px;
+    text-transform:uppercase;
+    margin-bottom:0px;
 }

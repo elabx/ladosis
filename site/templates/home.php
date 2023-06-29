@@ -89,14 +89,14 @@ $configuracion = $pages->get("name=configuracion");
 					<?php foreach($pages->find("template=articulo|carton, sort=-published, limit=5") as $article): ?>
 						<li>
 
-							<div class="uk-card uk-card-default uk-card-small">
+							<div class="uk-card  uk-card-small">
 								<div class="uk-card-media-top uk-cover-container uk-height-small">
 									<img src="<?php echo $article->article_images->first()->media->size(300, 150)->url; ?>"
 										 alt="" uk-cover>
 								</div>
 
 								<div class="uk-card-body">
-									<a href="<?php echo $article->url ?>"><h3 id="titulo" class="uk-text-small uk-text-bolder uk-card-title"><?php echo $article->title ?></h3></a>
+									<a href="<?php echo $article->url ?>"><h3 class="titulo uk-text-small uk-text-bolder uk-card-title"><?php echo $article->title ?></h3></a>
 									<p class="uk-text-small">
 										<?= $sanitizer->truncate($article->body, array(
 											'type' => 'punctuation',

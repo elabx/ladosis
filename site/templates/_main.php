@@ -15,6 +15,8 @@
     <script src="https://cdn.jsdelivr.net/npm/uikit@3.16.19/dist/js/uikit-icons.min.js"></script>
     <title>Document</title>
 </head>
+
+
 <body>
 <?php
 
@@ -37,10 +39,10 @@ $configuracion = $pages->get("name=configuracion");
     </div>
 </div>
 
-<div class="uk-container" >
+<div class="uk-container uk-margin-bottom" >
     <div>
         <nav class="uk-navbar-container" uk-navbar>
-            <div class="uk-navbar-center">
+            <div class="uk-navbar-left">
                 <ul class="uk-navbar-nav">
                     <?php $menu = $configuracion->menu ?>
                     <?php foreach($menu as $menuItem): ?>
@@ -141,5 +143,6 @@ $configuracion = $pages->get("name=configuracion");
 
 
 </body>
+
 </html>
 
