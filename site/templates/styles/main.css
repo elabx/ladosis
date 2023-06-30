@@ -13,9 +13,9 @@ p, ul, li{
     line-height: 1.35em;
 }
 
-.tag-list::before{
-    content:"Tags :"
-}
+/*.tag-list::before{*/
+/*    content:"Tags :"*/
+/*}*/
 
 .top-logo {
 
@@ -40,4 +40,42 @@ p, ul, li{
     font-size:14px;
     text-transform:uppercase;
     margin-bottom:0px;
+}
+
+.tag-list a{
+    padding:5px;
+    border-radius:3px;
+    background:green;
+    color:white;
+
+}
+
+.tag-list a:hover{
+    padding:5px;
+    border-radius:3px;
+    background:darkgreen;
+    color:white;
+
+}
+
+.tag-list::before{
+    content:"Tags :";
+    font-family: 'Oswald', serif;
+    color:green;
+    text-transform:uppercase;
+
+}
+
+.tag-list{
+    padding-left:0px;
+    font-family: 'Oswald', serif;
+    color:green;
+    text-transform:uppercase;
+}
+
+.uk-list-inline > li {
+    list-style: none;
+    display: inline-block;
+    padding-left: 5px;
+    padding-right: 5px;
 }

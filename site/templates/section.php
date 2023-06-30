@@ -46,7 +46,7 @@ if($page->template == "search"){
 
 
         <?php foreach($articles as $article): ?>
-            <div class="uk-margin-top uk-width-1-2@m">
+            <div class="uk-margin-top-large uk-width-1-2@m">
                 <article class=" ">
                     <div>
                         <a href="<?php echo $article->url ?>">
@@ -87,13 +87,15 @@ if($page->template == "search"){
 
                 <?php if($article->tags): ?>
                     <?php if($article->tags->count): ?>
-                        <ul class="tag-list uk-list-inline">
+                        <ul class="tag-list uk-list-inline uk-margin-large-bottom">
                             <?php foreach($article->tags as $tag): ?>
                                 <li><a href="<?php echo $tag->url ?>"><?php echo $tag->title ?></a></li>
                             <?php endforeach ?>
                         </ul>
                     <?php endif ?>
                 <?php endif ?>
+
+
             </div>
         <?php endforeach ?>
     </div>
@@ -106,8 +108,17 @@ if($page->template == "search"){
 <!---->
 <!--    </div>-->
 
-    <div class="pager">
-        <?php echo $articles->renderPager() ?>
+    <div class="pager uk-text-bold">
+        <?php echo $articles->renderPager(array(
+            'numPageLinks' => 5,
+            'listMarkup' => "<ul class='uk-pagination'>{out}</ul>",
+            'itemMarkup' => "<li class='{class}'>{out}</li>",
+            'linkMarkup' => "<a href='{url}'>{out}</a>",
+            'nextItemLabel' => '<span uk-icon="icon: chevron-right">Siguiente</span>',
+            'previousItemLabel' => '<span uk-icon="icon: chevron-left"></span><span>Anterior</span>',
+            'separatorItemLabel' => '<span>...</span>',
+            'currentItemClass' => 'uk-active',
+        )); ?>
     </div>
 
 </div>

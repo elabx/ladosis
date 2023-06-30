@@ -39,6 +39,7 @@ $configuracion = $pages->get("name=configuracion");
     </div>
 </div>
 
+<!--Menu-->
 <div class="uk-container uk-margin-bottom" >
     <div>
         <nav class="uk-navbar-container" uk-navbar>
@@ -49,7 +50,7 @@ $configuracion = $pages->get("name=configuracion");
 
                         <?php if($menuItem->menu_render_submenu): ?>
                             <li>
-                                <a  href="#">
+                                <a  href="">
                                     <?php
                                     /** @var RepeaterPage $menuItem  */
                                     if($menuItem->title){
@@ -78,14 +79,13 @@ $configuracion = $pages->get("name=configuracion");
                         <?php else: ?>
 
                             <li class="">
-                                <a href="">
+                                <a href="<?= $menuItem->menu_item->url; ?>">
                                     <?php
                                     if($menuItem->title){
                                         echo $menuItem->title;
                                     }else{
                                         // TODO Fix page field name
                                         echo $menuItem->menu_item->title;
-                                        bd($menuItem->menu_item);
                                     }
                                     ?>
                                 </a>
@@ -107,6 +107,7 @@ $configuracion = $pages->get("name=configuracion");
         <div class="uk-width-1-1">
 
             <h2 class="light-header underlined-title">Nuestras secciones</h2>
+            <hr>
             <div class="uk-grid">
                 <?php
                 $sections = $pages->get("name=secciones")->children()->getArray();
