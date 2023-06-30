@@ -48,15 +48,15 @@ $configuracion = $pages->get("name=configuracion");
 
 			<?php foreach ($configuracion->notas_resaltadas as $article): ?>
 				<div>
-					<div class="uk-card uk-card-default">
+					<div class="uk-card">
 						<div class="uk-card-media-top uk-cover-container uk-height-medium">
 							<img src="<?php echo $article->article_images->first()->media->size(300, 150)->url; ?>"
 								 alt="" uk-cover>
 						</div>
 
 						<div class="uk-card-body">
-							<a href="<?php echo $article->url ?>"><h3 id="titulo"
-									class="uk-card-title"><?php echo $article->title ?></h3></a>
+							<a href="<?php echo $article->url ?>"><h3
+									class="titulo uk-card-title"><?php echo $article->title ?></h3></a>
 
 							<p>
 								<?= $sanitizer->truncate($article->body, array(
@@ -134,14 +134,14 @@ $configuracion = $pages->get("name=configuracion");
 					<?php foreach ($configuracion->featured as $article): ?>
 						<li>
 
-							<div class="uk-card uk-card-default uk-card-small">
+							<div class="uk-card uk-card-small">
 								<div class="uk-card-media-top uk-cover-container uk-height-small">
 									<img src="<?php echo $article->article_images->first()->media->size(300, 150)->url; ?>"
 										 alt="" uk-cover>
 								</div>
 
 								<div class="uk-card-body">
-									<a href="<?php echo $article->url ?>"><h3 id="titulo" class="uk-text-small uk-text-bolder uk-card-title"><?php echo $article->title ?></h3></a>
+									<a href="<?php echo $article->url ?>"><h3 class="titulo uk-text-small uk-text-bolder uk-card-title"><?php echo $article->title ?></h3></a>
 									<p class="uk-text-small">
 										<?= $sanitizer->truncate($article->body, array(
 											'type' => 'punctuation',
