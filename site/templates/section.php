@@ -17,8 +17,8 @@ if($page->template == "search"){
                 Todas las secciones del sitio.
             </h3>
         <?php elseif($page->template == "seccion"):?>
-            <h3 class="underlined-title">
-                Estas viendo la sección de: <span class="visiting-section-tag"><?php echo $page->title ?></span>
+            <h3 class="">
+                Estas viendo la sección de: <span class=""><?php echo $page->title ?></span>
             </h3>
         <?php  elseif($page->template == "search"): ?>
             <h3 class="underlined-title">
@@ -48,9 +48,9 @@ if($page->template == "search"){
         <?php foreach($articles as $article): ?>
             <div class="uk-margin-top-large uk-width-1-2@m">
                 <article class=" ">
-                    <div>
+                    <div class="uk-card uk-card-body uk-card uk-card-hover uk-border-rounded">
                         <a href="<?php echo $article->url ?>">
-                            <h2 class="titulo"><?php echo $article->title ?></h2>
+                            <h2 class="titulo uk-card-title"><?php echo $article->title ?></h2>
                         </a>
 
                         <p class="uk-margin-bottom article-published-date">
@@ -82,18 +82,20 @@ if($page->template == "search"){
                         </p>
                         <a class="read-more uk-flex uk-flex-right" href="<?php echo $article->url ?>">Leer más &#10161;</a>
                         <div style="clear: both;"></div>
+
+                        <?php if($article->tags): ?>
+                            <?php if($article->tags->count): ?>
+                                <ul class="tag-list uk-list-inline uk-margin-large-bottom">
+                                    <?php foreach($article->tags as $tag): ?>
+                                        <li><a href="<?php echo $tag->url ?>"><?php echo $tag->title ?></a></li>
+                                    <?php endforeach ?>
+                                </ul>
+                            <?php endif ?>
+                        <?php endif ?>
                     </div>
                 </article>
 
-                <?php if($article->tags): ?>
-                    <?php if($article->tags->count): ?>
-                        <ul class="tag-list uk-list-inline uk-margin-large-bottom">
-                            <?php foreach($article->tags as $tag): ?>
-                                <li><a href="<?php echo $tag->url ?>"><?php echo $tag->title ?></a></li>
-                            <?php endforeach ?>
-                        </ul>
-                    <?php endif ?>
-                <?php endif ?>
+
 
 
             </div>

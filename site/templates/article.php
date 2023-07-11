@@ -2,7 +2,7 @@
 
 <div class="uk-container" uk-grid>
 
-<div class="uk-width-1-1@m">
+<div class="uk-width-2-3@m">
     <script type="application/ld+json">
 {
     "@context": "http://schema.org",
@@ -12,10 +12,9 @@
 }
 </script>
     <div class="">
-        <article class="uk-margin-large-top">
+        <article class="uk-margin-top">
 
             <h1><?php echo $page->title ?></h1>
-            <h2>prueba de lo que hago</h2>
 
             <p class="article-published-date">
                 <?php
@@ -44,12 +43,12 @@
                     </ul>
                 <?php endif ?>
             <?php endif ?>
-            <div class="article-body uk-margin-top">
-                <div class="uk-margin-top">
+            <div class="article-body">
                 <?php echo $page->body ?>
-                </div>
             </div>
-            <span class="share-social-text" >Comparte en redes:</span> <?php echo $modules->MarkupSocialShareButtons->render(); ?>
+
+            <span class="share-social-text " >Comparte en redes:</span> <?php echo $modules->MarkupSocialShareButtons->render(); ?>
+
 
             <ul class="tag-list uk-list-inline">
                 <?php foreach($page->tags as $tag): ?>
@@ -60,57 +59,14 @@
                 <?php endforeach ?>
             </ul>
         </article>
-        <div class="uk-grid">
-            <div class="uk-width-medium-1-1">
-                <h2 class="light-header uk-margin-large-top uk-margin-bottom underlined">Otros artículos...</h2>
-            </div>
-            <div class="uk-width-medium-1-2">
-                <h2>
-                    <a href="<?php echo $page->next->httpUrl?>">
-                        <?php echo $page->next->title ?>
-                    </a>
-                </h2>
-                <p>
-                <p>
-                    <?= $sanitizer->truncate($article->body, array(
-                        'type' => 'punctuation',
-                        'maxLength' => 150,
-                        'visible' => true,
-                        'more' => '...'
-                    )); ?>
-                </p>
-                <a class="read-more" href="<?php echo $article->url ?>">Leer más &#10161;</a>
-                </p>
-            </div>
-            <div class="uk-width-medium-1-2">
-                <h2>
-                    <a href="<?php echo $page->prev->httpUrl?>"><?php echo $page->prev->title ?>
-                    </a>
-                </h2>
-                <p>
-                    <?= $sanitizer->truncate($article->body, array(
-                        'type' => 'punctuation',
-                        'maxLength' => 150,
-                        'visible' => true,
-                        'more' => '...'
-                    )); ?>
-                </p>
-                <a class="read-more" href="<?php echo $article->url ?>">Leer más &#10161;</a>
-
-                <div class="uk-width-medium-10-10">
-                    <div id="disqus_thread"></div>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
-<div class="uk-width-1-3@m">
-    <div>
+<div class="uk-width-1-3@m" >
+    <div uk-sticky="end: true">
+        <div class=" uk-margin-top uk-margin-bottom">
 
-        <div class="uk-grid uk-margin-top uk-margin-bottom">
-
-            <div class="uk-width-5-10 uk-margin-top uk-margin-bottom">
+            <div class="uk-margin-top uk-margin-bottom">
                 <h5 onclick="$('.paypal-button input[name=submit]').click()" style="border-radius:5px;padding:5px;background:darkgreen;color:white;cursor:pointer;text-align:center;">Apoya al periodismo psicoactivo</h5>
             </div>
             <div class="paypal-button uk-width-5-10">
@@ -134,6 +90,54 @@
     </div>
 
 </div>
+</div>
+
+    <div class="">
+        <div class="">
+            <h2 class="light-header uk-margin-large-top uk-margin-bottom underlined">Otros artículos...</h2>
+        </div>
+
+        <div class="uk-child-width-expand"uk-grid>
+            <div class="">
+                <h2>
+                    <a href="<?php echo $page->next->httpUrl?>">
+                        <?php echo $page->next->title ?>
+                    </a>
+                </h2>
+                <p>
+                <p>
+                    <?= $sanitizer->truncate($page->next->body, array(
+                        'type' => 'punctuation',
+                        'maxLength' => 150,
+                        'visible' => true,
+                        'more' => '...'
+                    ));
+                    bd($page->next->body); ?>
+                </p>
+                <a class="read-more" href="<?php echo $article->url ?>">Leer más &#10161;</a>
+                </p>
+            </div>
+            <div class="">
+                <h2>
+                    <a href="<?php echo $page->prev->httpUrl?>"><?php echo $page->prev->title ?>
+                    </a>
+                </h2>
+                <p>
+                    <?= $sanitizer->truncate($page->prev->body, array(
+                        'type' => 'punctuation',
+                        'maxLength' => 150,
+                        'visible' => true,
+                        'more' => '...'
+                    )); ?>
+                </p>
+                <a class="read-more" href="<?php echo $article->url ?>">Leer más &#10161;</a>
+
+            </div>
+        </div>
+    </div>
+
+<div class="uk-width-1-1@m">
+    <div id="disqus_thread"></div>
 </div>
 
     <script>

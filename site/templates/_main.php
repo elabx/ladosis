@@ -1,3 +1,29 @@
+<?php namespace ProcessWire;
+
+
+\Less_Autoloader::register();
+
+//Compile UIKit
+
+$less_files = array();
+$uikitFile = $config->paths->templates . 'css/uikit-custom.less';
+
+$less_files = array(
+    $uikitFile => $config->path->templates . 'css/uikit-custom.css'
+);
+
+$uikitOptions = array(
+    'cache_dir'    => $config->paths->assets . 'cache/less/',
+    'output'       => $config->paths->templates . 'css/build.css',
+    'relativeUrls' => true
+);
+
+$uikitCustomFilename = \Less_Cache::Get($less_files, $uikitOptions);
+
+
+
+?>
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -7,13 +33,20 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
 
 
-    <!-- UIkit CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3.16.19/dist/css/uikit.min.css" />
-    <link rel="stylesheet" type="text/css" href="/site/templates/styles/main.css">
+    <link rel="stylesheet" href="<?= $urls->templates ?>css/build.css" class="href">
+    <link rel="stylesheet" href="<?= $urls->templates ?>styles/main.css" class="href">
+    <script src="<?= $urls->templates ?>js/uikit.min.js"></script>
+    <script src="<?= $urls->templates ?>js/uikit-icons.min.js"></script>
 
-    <!-- UIkit JS -->
-    <script src="https://cdn.jsdelivr.net/npm/uikit@3.16.19/dist/js/uikit.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/uikit@3.16.19/dist/js/uikit-icons.min.js"></script>
+
+
+<!--    <!- UIkit CSS -->
+<!--    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3.16.19/dist/css/uikit.min.css" />-->
+<!--    <link rel="stylesheet" type="text/css" href="/site/templates/styles/main.css">-->
+<!---->
+<!--    <!- UIkit JS -->
+<!--    <script src="https://cdn.jsdelivr.net/npm/uikit@3.16.19/dist/js/uikit.min.js"></script>-->
+<!--    <script src="https://cdn.jsdelivr.net/npm/uikit@3.16.19/dist/js/uikit-icons.min.js"></script>-->
     <title>Document</title>
 </head>
 
@@ -43,8 +76,8 @@ $configuracion = $pages->get("name=configuracion");
 <!--Menu-->
 <div class="uk-container uk-margin-bottom" >
     <div>
-        <nav class="uk-navbar-container" uk-navbar>
-            <div class="uk-navbar-left">
+        <nav class="navbar-ladosis" uk-navbar>
+            <div class="uk-navbar-left uk-margin-small-left">
                 <ul class="uk-navbar-nav">
                     <?php $menu = $configuracion->menu ?>
                     <?php foreach($menu as $menuItem): ?>
@@ -108,7 +141,7 @@ $configuracion = $pages->get("name=configuracion");
         <div class="uk-width-1-1">
 
             <h2 class="light-header underlined-title">Nuestras secciones</h2>
-            <hr>
+
             <div class="uk-grid">
                 <?php
                 $sections = $pages->get("name=secciones")->children()->getArray();
