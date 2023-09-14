@@ -39,14 +39,6 @@ $uikitCustomFilename = \Less_Cache::Get($less_files, $uikitOptions);
     <script src="<?= $urls->templates ?>js/uikit-icons.min.js"></script>
 
 
-
-<!--    <!- UIkit CSS -->
-<!--    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3.16.19/dist/css/uikit.min.css" />-->
-<!--    <link rel="stylesheet" type="text/css" href="/site/templates/styles/main.css">-->
-<!---->
-<!--    <!- UIkit JS -->
-<!--    <script src="https://cdn.jsdelivr.net/npm/uikit@3.16.19/dist/js/uikit.min.js"></script>-->
-<!--    <script src="https://cdn.jsdelivr.net/npm/uikit@3.16.19/dist/js/uikit-icons.min.js"></script>-->
     <title>Document</title>
 </head>
 
@@ -59,7 +51,7 @@ use ProcessWire\RepeaterPage;
 $configuracion = $pages->get("name=configuracion");
 ?>
 
-<div class="uk-container uk-margin">
+<div class="uk-container uk-margin uk-visible@m">
     <div class="" uk-grid>
         <div class="uk-width-1-4@m">
             <img src="<?php echo $configuracion->logo->width(250)->url ?>">
@@ -74,7 +66,7 @@ $configuracion = $pages->get("name=configuracion");
 </div>
 
 <!--Menu-->
-<div class="uk-container uk-margin-bottom" >
+<div class="uk-container uk-margin-bottom uk-visible@m" >
     <div>
         <nav class="navbar-ladosis" uk-navbar>
             <div class="uk-navbar-left uk-margin-small-left">
@@ -132,6 +124,93 @@ $configuracion = $pages->get("name=configuracion");
     </div>
 </div>
 
+<!--Menu hidden-->
+<div class="mobile-navbar" uk-sticky>
+    <div class="uk-background-default uk-container">
+        <div class="uk-hidden@m">
+            <nav class="uk-navbar">
+                <div class="uk-navbar-left">
+                    <div class="uk-width-1-4@m">
+                        <img src="<?php echo $configuracion->logo->width(250)->url ?>">
+
+                    </div>
+                </div>
+                <div class="uk-navbar-right">
+                    <div>
+                        <a aria-haspopup="true" tabindex="0" uk-toggle="target:#offcanvas-menu"
+                           class="menu-toggle uk-navbar-item">
+                            <i uk-icon="icon:menu;ratio:2;"></i>
+                        </a>
+                    </div>
+                </div>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<div id="offcanvas-menu" uk-offcanvas="mode:reveal;overlay:true;">
+
+    <div class="uk-offcanvas-bar">
+
+        <div class="uk-position-small uk-position-top-right">
+            <a href="" uk-toggle="target:#offcanvas-menu">
+                <i uk-icon="icon:close;ratio:2"></i>
+            </a>
+        </div>
+
+        <ul class="uk-nav uk-navbar-dropdown-nav">
+            <?php $menu = $configuracion->menu ?>
+            <?php foreach($menu as $menuItem): ?>
+
+                <?php if($menuItem->menu_render_submenu): ?>
+
+                    <li>
+                        <a  href="">
+                            <?php
+                            /** @var RepeaterPage $menuItem  */
+                            if($menuItem->title){
+                                echo $menuItem->title;
+                            }else{
+                                // TODO Fix page field name
+                                echo $menuItem->menu_item->title;
+                            }
+                            ?>
+                        </a>
+                        <div class="uk-navbar-dropdown">
+                            <ul class="uk-nav uk-navbar-dropdown-nav">
+                                <?php foreach($menuItem->menu_item->children as $submenuItem): ?>
+                                    <li>
+                                        <a href="<?=$submenuItem->url?>">
+                                            <?=$submenuItem->title?>
+                                        </a>
+                                    </li>
+                                <?php endforeach ?>
+                            </ul>
+                        </div>
+                    </li>
+                <?php else: ?>
+
+                    <li class="">
+                        <a href="<?= $menuItem->menu_item->url; ?>">
+                            <?php
+                            if($menuItem->title){
+                                echo $menuItem->title;
+                            }else{
+                                // TODO Fix page field name
+                                echo $menuItem->menu_item->title;
+                            }
+                            ?>
+                        </a>
+                    </li>
+                <?php endif ?>
+            <?php endforeach ?>
+        </ul>
+
+    </div>
+
+</div>
+
+
     <main id="content"></main>
 
 <footer class="uk-container-center uk-container uk-margin-large-top">
@@ -181,3 +260,12 @@ $configuracion = $pages->get("name=configuracion");
 
 </html>
 
+
+
+
+
+$secciones=$pages->find('template=seccion');
+foreach ($secciones as $seccion){
+$articuloPages = $pages->count("template=articulo, categories=$seccion");
+bd($articuloPages);
+}

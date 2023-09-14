@@ -1,85 +1,4 @@
 #################################################################################################
-# ProcessWire ProCache recommended .htaccess tweaks for expires and gzip performance settings. 
-# PWPC-3.0 Keep this line here for ProCache identification purposes. 
-#################################################################################################
-<IfModule mod_headers.c>
-  Header set Connection keep-alive
-  Header unset ETag
-  <FilesMatch "\.(eot|otf|ttc|ttf|woff|woff2)$">
-    Header set Access-Control-Allow-Origin "*"
-  </FilesMatch>
-  <FilesMatch "pwpc-.*\.(css|js)$">
-    Header set Cache-Control "max-age=3650000, immutable"
-  </FilesMatch>
-</IfModule>
-FileETag None
-<IfModule mod_expires.c>
-  ExpiresActive On
-  ExpiresDefault "access plus 1 month"
-  # html
-  ExpiresByType text/html "access plus 1 hour"
-  # images
-  ExpiresByType image/jpeg "access plus 1 year"
-  ExpiresByType image/png "access plus 1 year"
-  ExpiresByType image/gif "access plus 1 year"
-  ExpiresByType image/svg+xml "access plus 1 year"
-  ExpiresByType image/bmp "access plus 1 year"
-  ExpiresByType image/webp "access plus 1 year"
-  # css and js
-  ExpiresByType text/css "access plus 1 year"
-  ExpiresByType text/javascript "access plus 1 year"
-  ExpiresByType application/javascript "access plus 1 year"
-  ExpiresByType application/x-javascript "access plus 1 year"
-  # downloads
-  ExpiresByType application/octet-stream "access plus 1 year"
-  # feeds
-  ExpiresByType application/json "access plus 0 seconds"
-  ExpiresByType application/xml "access plus 0 seconds"
-  ExpiresByType text/xml "access plus 0 seconds"
-  # icon / favicon
-  ExpiresByType image/vnd.microsoft.icon "access plus 1 year"
-  ExpiresByType image/x-icon "access plus 1 year"
-  # font
-  ExpiresByType application/x-font-ttf "access plus 1 year"
-  ExpiresByType application/x-font-woff "access plus 1 year"
-  ExpiresByType application/font-woff "access plus 1 year"
-  ExpiresByType application/font-woff2 "access plus 1 year"
-  ExpiresByType font/woff "access plus 1 year"
-  ExpiresByType application/vnd.ms-fontobject "access plus 1 year"
-  ExpiresByType font/eot "access plus 1 year"
-  ExpiresByType font/opentype "access plus 1 year"
-  # audio/video
-  ExpiresByType audio/ogg "access plus 1 month"
-  ExpiresByType video/mp4 "access plus 1 month"
-  ExpiresByType video/ogg "access plus 1 month"
-  ExpiresByType video/webm "access plus 1 month"
-</IfModule>
-<IfModule mod_deflate.c>
-  <IfModule mod_setenvif.c>
-     <IfModule mod_headers.c>
-        # Force compression for mangled `Accept-Encoding` request headers
-        # https://developer.yahoo.com/blogs/ydn/pushing-beyond-gzipping-25601.html
-        SetEnvIfNoCase ^(Accept-EncodXng|X-cept-Encoding|X{15}|~{15}|-{15})$ ^((gzip|deflate)\s*,?\s*)+|[X~-]{4,13}$ HAVE_Accept-Encoding
-        RequestHeader append Accept-Encoding "gzip,deflate" env=HAVE_Accept-Encoding
-     </IfModule>
-  </IfModule>
-  # <IfModule mod_filter.c> # Apache 2.3.7 and above may need to uncomment this line
-    AddOutputFilterByType DEFLATE "text/html"
-    AddOutputFilterByType DEFLATE "text/plain"
-    AddOutputFilterByType DEFLATE "text/css"
-    AddOutputFilterByType DEFLATE "text/javascript" 
-    AddOutputFilterByType DEFLATE "application/javascript"
-    AddOutputFilterByType DEFLATE "application/x-javascript"
-    AddOutputFilterByType DEFLATE "application/json"
-    AddOutputFilterByType DEFLATE "application/xml"
-    AddOutputFilterByType DEFLATE "image/svg+xml"
-    AddOutputFilterByType DEFLATE "text/xml"
-  # </IfModule> # Apache 2.3.7 and above may need to uncomment this line
-</IfModule>
-# End ProcessWire ProCache recommended tweaks
-#################################################################################################
-
-#################################################################################################
 # START PROCESSWIRE HTACCESS DIRECTIVES
 # @version 3.0
 # @htaccessVersion 301
@@ -269,17 +188,21 @@ DirectoryIndex index.php index.html index.htm
   # -----------------------------------------------------------------------------------------------
   # 9. Optionally Force HTTPS (O) 
   # -----------------------------------------------------------------------------------------------
-
-  # 9A. To redirect HTTP requests to HTTPS, uncomment the lines below: 
+  # Note that on some web hosts you may need to replace %{HTTPS} with %{ENV:HTTPS} in order
+  # for it to work (in sections 9A and 9D below). If on a load balancer or proxy setup, you will
+  # likely need to use 9B rather than 9A, and 9E rather than 9D.  
   # -----------------------------------------------------------------------------------------------
-#   RewriteCond %{HTTPS} !=on
-#   RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-
-  # 9B. If using load balancer/AWS, use the following rather than 9A above: (L)
+  # 9A. To redirect HTTP requests to HTTPS, uncomment the lines below (also see note above):
   # -----------------------------------------------------------------------------------------------
-   RewriteCond %{HTTP:X-Forwarded-Proto} =http 
-   RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+  # RewriteCond %{HTTPS} !=on
+  # RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+
+  # 9B. If using load balancer/AWS or behind proxy, use the following rather than 9A above: (L)
+  # -----------------------------------------------------------------------------------------------
+  # RewriteCond %{HTTP:X-Forwarded-Proto} =http 
+  # RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
   
   # 9C. If using cPanel AutoSSL or Let's Encrypt webroot you may need to MOVE one of the below
@@ -290,7 +213,7 @@ DirectoryIndex index.php index.html index.htm
   # RewriteCond %{REQUEST_URI} !^/\.well-known/pki-validation/[A-F0-9]{32}\.txt(?:\ Comodo\ DCV)?$
  
   
-  # 9D. Store current scheme in a 'proto' environment variable for later use in this file
+  # 9D. Store current scheme in a 'proto' environment variable for later use
   # -----------------------------------------------------------------------------------------------
   RewriteCond %{HTTPS} =on
   RewriteRule ^ - [env=proto:https]
@@ -298,7 +221,7 @@ DirectoryIndex index.php index.html index.htm
   RewriteRule ^ - [env=proto:http]
   
  
-  # 9E. If using Load balancer/AWS- Use lines below rather than 9D: (L)
+  # 9E. If using load balancer/AWS or behind proxy, use lines below rather than 9D: (L)
   # -----------------------------------------------------------------------------------------------
   # RewriteCond %{HTTP:X-Forwarded-Proto} =https 
   # RewriteRule ^ - [env=proto:https]
@@ -322,7 +245,58 @@ DirectoryIndex index.php index.html index.htm
   </IfModule>
 
 
-  # Sections 10 and 11 intentionally omitted
+  # Section 10 intentionally omitted for future use
+ 
+  # -----------------------------------------------------------------------------------------------
+  # 11. Nuisance blocking/firewall
+  # -----------------------------------------------------------------------------------------------
+  # None of these are enabled by default, but are here for convenience when the need arises.
+  # Review and uncomment as needed. For more complete firewall (and more overhead), the 7G firewall
+  # (or latest version) is worth considering, see: https://perishablepress.com/7g-firewall/
+  # -----------------------------------------------------------------------------------------------
+ 
+  # 11A. Block via IP addresses
+  # -----------------------------------------------------------------------------------------------
+  # Note that IP addresses here are examples only and should be replaced with actual IPs.
+  
+  # Block single IP address
+  # Deny from 111.222.333.444
+  
+  # Block multiple IP addresses
+  # Deny from 111.222.333.444 44.33.22.11
+  
+  # Block IP address ranges (999.88.*, 99.88.77.*, 1.2.3.*)
+  # Deny from 999.888 99.88.77 1.2.3
+  
+  # 11B. Block via request URI (matches strings anywhere in request URL)
+  # -----------------------------------------------------------------------------------------------
+  # RewriteCond %{REQUEST_URI} (bad-word|wp-admin|wp-content) [NC]
+  # RewriteRule .* - [F,L]
+	  
+  # 11B. Block via user agent strings (matches strings anywhere in user-agent)
+  # -----------------------------------------------------------------------------------------------
+  # RewriteCond %{HTTP_USER_AGENT} (bad-bot|mean-bot) [NC]
+  # RewriteRule .* - [F,L]  
+  
+  # 11C. Block via remote hosts 
+  # -----------------------------------------------------------------------------------------------
+  # RewriteCond %{REMOTE_HOST} (bad-host|annoying-host) [NC]
+  # RewriteRule .* - [F,L]
+  
+  # 11D. Block via HTTP referrer (matches anywhere in referrer URL)
+  # -----------------------------------------------------------------------------------------------
+  # RewriteCond %{HTTP_REFERER} (bad-referrer|gross-referrer) [NC]
+  # RewriteRule .* - [F,L]
+  
+  # 11E. Block unneeded request methods (only if you do not need them)
+  # -----------------------------------------------------------------------------------------------
+  # RewriteCond %{REQUEST_METHOD} ^(connect|debug|delete|move|put|trace|track) [NC]
+  # RewriteRule .* - [F,L]  
+  
+  # 11F. Limit file upload size from Apache (i.e. 10240000=10 MB, adjust as needed)
+  # -----------------------------------------------------------------------------------------------
+  # LimitRequestBody 10240000
+  
  
   
   # -----------------------------------------------------------------------------------------------
@@ -337,21 +311,26 @@ DirectoryIndex index.php index.html index.htm
   # 13. Optional domain redirects (O)
   # 
   # Redirect domain.com to www.domain.com redirect (or www to domain.com redirect). 
-  # If using then uncomment either 13A or 13B, do NOT uncomment both of them or nothing will work.
+  # To use, uncomment either 13A, 13B or 13C. Do not use more than one of them. 13A and 13B 
+  # redirect non-www hosts to www.domain.com, 13C redirects www.domain.com host to domain.com.
   # -----------------------------------------------------------------------------------------------
 
-  # 13A. Redirect domain.com and *.domain.com to www.domain.com (do not combine with 13B): 
+  # 13A. Redirect domain.com and *.domain.com to www.domain.com (see also 13B as alternate):
   # -----------------------------------------------------------------------------------------------
   # RewriteCond %{HTTP_HOST} !^www\. [NC]
   # RewriteCond %{SERVER_ADDR} !=127.0.0.1
   # RewriteCond %{SERVER_ADDR} !=::1
   # RewriteRule ^ %{ENV:PROTO}://www.%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
- 
   
-  # 13B. Redirect www.domain.com to domain.com (do not combine with 13A):
+  # 13B. Alternate www redirect if 13A does not work for your server: 
   # -----------------------------------------------------------------------------------------------
-   RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
-   RewriteRule ^ %{ENV:PROTO}://%1%{REQUEST_URI} [R=301,L]
+  # RewriteCond %{HTTP_HOST} !^www\. [NC]
+  # RewriteRule ^ %{ENV:PROTO}://www.%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+ 
+  # 13C. Redirect www.domain.com to domain.com (do not combine with 13A or 13B):
+  # -----------------------------------------------------------------------------------------------
+  # RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+  # RewriteRule ^ %{ENV:PROTO}://%1%{REQUEST_URI} [R=301,L]
 
 
   # ----------------------------------------------------------------------------------------------- 
@@ -390,19 +369,22 @@ DirectoryIndex index.php index.html index.htm
   RewriteCond %{REQUEST_URI} (^|/)(site|site-[^/]+)/assets.*/-.+/.* [NC,OR]
   
   # Block access to /wire/config.php, /site/config.php, /site/config-dev.php, /wire/index.config.php, etc.
-  RewriteCond %{REQUEST_URI} (^|/)(wire|site|site-[^/]+)/(config|index\.config|config-dev)\.php$ [NC,OR]
+  RewriteCond %{REQUEST_URI} (^|/)(wire|site|site-[^/]+)/(config|index\.config|config-dev)\.php($|/) [NC,OR]
   
   # Block access to any PHP-based files in /site/templates-admin/ or /wire/templates-admin/
-  RewriteCond %{REQUEST_URI} (^|/)(wire|site|site-[^/]+)/templates-admin($|/|/.*\.(php|html?|tpl|inc))$ [NC,OR]
+  RewriteCond %{REQUEST_URI} (^|/)(wire|site|site-[^/]+)/templates-admin($|/|/.*\.(php|html?|tpl|inc))($|/) [NC,OR]
   
   # Block access to any PHP or markup files in /site/templates/ or /site-*/templates/
-  RewriteCond %{REQUEST_URI} (^|/)(site|site-[^/]+)/templates($|/|/.*\.(php|html?|tpl|inc))$ [NC,OR]
+  RewriteCond %{REQUEST_URI} (^|/)(site|site-[^/]+)/templates($|/|/.*\.(php|html?|tpl|inc))($|/) [NC,OR]
+  
+  # Block access to any files in /site/classes/ or /site-*/classes/
+  RewriteCond %{REQUEST_URI} (^|/)(site|site-[^/]+)/classes($|/.*) [NC,OR]
   
   # Block access to any PHP files within /site/assets/ and further
-  RewriteCond %{REQUEST_URI} (^|/)(site|site-[^/]+)/assets($|/|/.*\.php)$ [NC,OR]
+  RewriteCond %{REQUEST_URI} (^|/)(site|site-[^/]+)/assets($|/|/.*\.ph(p|ps|tml|p[0-9]))($|/) [NC,OR]
   
   # Block access to any PHP, module, inc or info files in core or core modules directories
-  RewriteCond %{REQUEST_URI} (^|/)wire/(core|modules)/.*\.(php|inc|tpl|module|info\.json)$ [NC,OR]
+  RewriteCond %{REQUEST_URI} (^|/)wire/(core|modules)/.*\.(php|inc|tpl|module|info\.json)($|/) [NC,OR]
   
   # Block access to any PHP, tpl or info.json files in /site/modules/ or /site-*/modules/
   RewriteCond %{REQUEST_URI} (^|/)(site|site-[^/]+)/modules/.*\.(php|inc|tpl|module|info\.json)$ [NC,OR]
@@ -461,26 +443,12 @@ DirectoryIndex index.php index.html index.htm
   # then don't give control to ProcessWire, and instead load the file
   # ----------------------------------------------------------------------------------------------- 
 
-
-  # --- ProCache Manual Directives from 2020-08-06 00:54:17 ---------------------------------------
-  # PROCACHE v89b4cbf0979048b4656f38ef9a2dbee7
-  RewriteCond %{REQUEST_METHOD} !=POST
-  RewriteCond %{QUERY_STRING} !.*=.*
-  RewriteCond %{HTTP_COOKIE} !^.*(wire_challenge|wires_challenge).*$
-  RewriteCond %{DOCUMENT_ROOT}/site/assets/ProCache-8eac512e3602a815615ff032d4e9/$1/index.html -f
-  RewriteRule ^(.*) %{DOCUMENT_ROOT}/site/assets/ProCache-8eac512e3602a815615ff032d4e9/$1/index.html [L]
-  # /PROCACHE
-  # If using UTF8 page names update the line below consistent with your $config->pageNameWhitelist
-  # or copy the existing uncommented line from the PW-PAGENAME section of your .htaccess file.
-  RewriteCond %{REQUEST_URI} "^/~?[-_.a-zA-Z0-9/]*$"
-  # --- End ProCache Manual Directives ------------------------------------------------------------
-
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteCond %{REQUEST_FILENAME} !(favicon\.ico|robots\.txt)
 
   # -----------------------------------------------------------------------------------------------
-  # 18. Optionally (O) prevent PW from attempting to serve images or anything in /site/assets/. 
+  # 18. Optionally (O) prevent PW from serving some file types, or anything in /site/assets/. 
   # Both of these lines are optional, but can help to reduce server load. However, they
   # are not compatible with the $config->pagefileSecure option (if enabled) and they 
   # may produce an Apache 404 rather than your regular 404. You may uncomment the two lines
@@ -490,7 +458,7 @@ DirectoryIndex index.php index.html index.htm
   # section #2 above that makes ProcessWire the 404 handler. 
   # ----------------------------------------------------------------------------------------------- 
 
-  # RewriteCond %{REQUEST_FILENAME} !\.(jpg|jpeg|gif|png|ico|webp|svg)$ [NC]
+  # RewriteCond %{REQUEST_URI} !\.(jpg|jpeg|gif|png|ico|webp|svg|js|css)$ [NC]
   # RewriteCond %{REQUEST_FILENAME} !(^|/)site/assets/
 
   # ----------------------------------------------------------------------------------------------- 
@@ -511,4 +479,3 @@ DirectoryIndex index.php index.html index.htm
 #################################################################################################
 # END PROCESSWIRE HTACCESS DIRECTIVES
 #################################################################################################
-

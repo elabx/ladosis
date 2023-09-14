@@ -189,7 +189,7 @@ p, ul, li{
     border: 1px solid darkgreen;
 }
 
-
+/*
 .uk-dropdown{
     font-size:1.15em
 }
@@ -228,6 +228,7 @@ p, ul, li{
     outline: 0;
 }
 
+
 .uk-navbar-nav>li.selected, .uk-offcanvas-bar .uk-nav li.selected{
     background:darkgreen;
 }
@@ -235,3 +236,29 @@ p, ul, li{
 .uk-navbar-nav>li.selected>a, .uk-offcanvas-bar .uk-nav li.selected a{
     color:white;
 }
+
+.uk-offcanvas-bar{
+    background:#f7f7f7;
+}
+
+
+.uk-offcanvas-bar .uk-nav li a{
+    color:darkgreen;
+    font-family:Oswald;
+    font-size:1.3em
+}
+
+
+
+ul.uk-nav-sub{
+    padding-left:30px;
+}
+
+.uk-navbar-nav>li.selected, .uk-offcanvas-bar .uk-nav li.selected{
+    background:darkgreen;
+}
+
+.uk-navbar-nav>li.selected>a, .uk-offcanvas-bar .uk-nav li.selected a{
+    color:black;
+}
+*/

@@ -1,7 +1,47 @@
 @import "uikit/src/less/uikit.less";
 
 @base-body-color: #515151;
+@offcanvas-bar-background: #fff;
+@offcanvas-bar-color-mode: none;
+@navbar-dropdown-background: white;
+@navbar-nav-item-color: darkgreen;
+@navbar-nav-item-hover-color: #0dda73;
 
-h1{
-  color: red;
+.uk-navbar-nav > li > a, .uk-navbar-item, .uk-navbar-toggle {
+  text-transform: uppercase;
+  transition: color 0.3s;
+  min-height: 40px;
+}
+
+.uk-navbar-dropdown{
+  box-shadow: 0 5px 12px rgba(0,0,0,.15);
+  padding:0;
+}
+
+.uk-nav li > a {
+  padding: 5px 15px;
+  display: block;
+}
+
+.hook-navbar-dropdown-nav-item(){
+  font-family:Oswald;
+  font-size:1.3em;
+  color:darkgreen;
+  &:hover{
+    background-color: darkgreen;
+  }
+}
+
+.hook-navbar-dropdown-nav-item-hover(){
+  color:white;
+}
+
+.hook-offcanvas-bar(){
+  background-color: white;
+  a {
+    color: darkgreen;
+  }
+  a:hover{
+    color: #0dda73;
+  }
 }

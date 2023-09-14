@@ -18,7 +18,8 @@ $configuracion = $pages->get("name=configuracion");
 				</div>
 
 				<div class="uk-width-2-5@m">
-					<h3 class="uk-text-center"><span class="uk-text-underline">Versión impresa</span></h3>
+					<h3 class=""><span class="uk-text-underline">Versión impresa</span></h3>
+					<hr>
 					<?php $issue =  $pages->find("template=periodico")->sort('-published')->first(); ?>
 					<a href="<?php echo $issue->url ?>">
 						<?php if($issue->image): ?>
