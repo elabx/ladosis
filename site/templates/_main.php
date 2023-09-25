@@ -76,7 +76,7 @@ $configuracion = $pages->get("name=configuracion");
 
                         <?php if($menuItem->menu_render_submenu): ?>
                             <li>
-                                <a  href="">
+                                <a href="<?= $menuItem->menu_item->url; ?>">
                                     <?php
                                     /** @var RepeaterPage $menuItem  */
                                     if($menuItem->title){
@@ -158,14 +158,14 @@ $configuracion = $pages->get("name=configuracion");
             </a>
         </div>
 
-        <ul class="uk-nav uk-navbar-dropdown-nav">
+        <ul class="uk-nav">
             <?php $menu = $configuracion->menu ?>
             <?php foreach($menu as $menuItem): ?>
 
                 <?php if($menuItem->menu_render_submenu): ?>
 
-                    <li>
-                        <a  href="">
+                    <li class="uk-parent">
+                        <a href="<?= $menuItem->menu_item->url; ?>">
                             <?php
                             /** @var RepeaterPage $menuItem  */
                             if($menuItem->title){
@@ -176,8 +176,7 @@ $configuracion = $pages->get("name=configuracion");
                             }
                             ?>
                         </a>
-                        <div class="uk-navbar-dropdown">
-                            <ul class="uk-nav uk-navbar-dropdown-nav">
+                            <ul class="uk-nav-sub">
                                 <?php foreach($menuItem->menu_item->children as $submenuItem): ?>
                                     <li>
                                         <a href="<?=$submenuItem->url?>">
@@ -186,7 +185,6 @@ $configuracion = $pages->get("name=configuracion");
                                     </li>
                                 <?php endforeach ?>
                             </ul>
-                        </div>
                     </li>
                 <?php else: ?>
 

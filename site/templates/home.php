@@ -82,14 +82,11 @@ $configuracion = $pages->get("name=configuracion");
 	</div>
 
 	<div class="uk-container uk-margin-top">
-
-		<div class="uk-slider-container" uk-slider>
-			<div class="uk-position-relative uk-visible-toggle" tabindex="-1" >
+		<div class="uk-container uk-slider-container" uk-slider>
+			<div class="uk-position-relative" tabindex="-1" >
 				<ul class="uk-slider-items uk-child-width-1-4@m uk-grid-match uk-grid">
-
 					<?php foreach($pages->find("template=articulo|carton, sort=-published, limit=5") as $article): ?>
 						<li>
-
 							<div class="uk-card  uk-card-small">
 								<div class="uk-card-media-top uk-cover-container uk-height-small">
 									<img src="<?php echo $article->article_images->first()->media->size(300, 150)->url; ?>"
@@ -129,7 +126,7 @@ $configuracion = $pages->get("name=configuracion");
 	<div class="uk-container uk-margin-top">
 
 		<div class="uk-slider-container" uk-slider>
-			<div class="uk-position-relative uk-visible-toggle" tabindex="-1" >
+			<div class="uk-position-relative" tabindex="-1" >
 				<ul class="uk-slider-items uk-child-width-1-4@m uk-grid-match uk-grid">
 
 					<?php foreach ($configuracion->featured as $article): ?>

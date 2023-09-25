@@ -3754,6 +3754,8 @@ select.uk-form-width-xsmall {
 }
 .uk-offcanvas-bar a {
   color: darkgreen;
+  font-family: Oswald;
+  font-size: 1.3em;
 }
 .uk-offcanvas-bar a:hover {
   color: #0dda73;
@@ -4633,6 +4635,12 @@ select.uk-form-width-xsmall {
  */
 ul.uk-nav-sub {
   padding: 5px 0 5px 15px;
+  font-family: Oswald;
+  font-size: 1.3em;
+  color: darkgreen;
+}
+ul.uk-nav-sub li:hover {
+  background-color: darkgreen;
 }
 /*
  * Level 3 and deeper
@@ -5090,6 +5098,8 @@ ul.uk-nav-sub {
   padding: 15px;
   background: #ffffff;
   color: #666666;
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.15);
+  padding: 0;
 }
 /*
  * Remove margin from the last-child
@@ -11705,7 +11715,13 @@ iframe[data-uk-cover] {
   transition: color 0.3s;
   min-height: 40px;
 }
-.uk-navbar-dropdown {
+.uk-navbar-nav > li > a .active,
+.uk-navbar-item .active,
+.uk-navbar-toggle .active {
+  background-color: darkgreen;
+  /* Apply the desired style for the active li */
+}
+.hook-navbar-dropdown {
   box-shadow: 0 5px 12px rgba(0, 0, 0, 0.15);
   padding: 0;
 }

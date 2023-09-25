@@ -11,9 +11,12 @@
   text-transform: uppercase;
   transition: color 0.3s;
   min-height: 40px;
+  .active {
+    background-color: darkgreen; /* Apply the desired style for the active li */
+  }
 }
 
-.uk-navbar-dropdown{
+.hook-navbar-dropdown{
   box-shadow: 0 5px 12px rgba(0,0,0,.15);
   padding:0;
 }
@@ -40,8 +43,19 @@
   background-color: white;
   a {
     color: darkgreen;
+    font-family:Oswald;
+    font-size:1.3em;
   }
   a:hover{
     color: #0dda73;
+  }
+}
+
+.hook-nav-sub(){
+  font-family:Oswald;
+  font-size:1.3em;
+  color:darkgreen;
+  li:hover{
+    background-color: darkgreen;
   }
 }
