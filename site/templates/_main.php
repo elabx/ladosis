@@ -231,11 +231,12 @@ $configuracion = $pages->get("name=configuracion");
                         <ul class="uk-list uk-list-line">
                             <?php foreach($chunk as $seccion): ?>
                                 <li>
-                                    <h4>
-                                        <a href="<?php echo $seccion->url ?>">
+                                    <h5>
+                                        <a class="footer-links" href="<?php echo $seccion->url ?>">
                                             <?php echo $seccion->title ?>
                                         </a>
-                                    </h4>
+                                        <hr>
+                                    </h5>
                                 </li>
                             <?php endforeach ?>
                         </ul>
@@ -257,13 +258,3 @@ $configuracion = $pages->get("name=configuracion");
 </body>
 
 </html>
-
-
-
-
-
-$secciones=$pages->find('template=seccion');
-foreach ($secciones as $seccion){
-$articuloPages = $pages->count("template=articulo, categories=$seccion");
-bd($articuloPages);
-}

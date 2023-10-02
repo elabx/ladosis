@@ -13,15 +13,15 @@ if($page->template == "search"){
 
     <div class="uk-container uk-width-1-2@m uk-margin uk-flex uk-flex-left" uk-grid>
         <?php if($page->template=="todas-secciones"):  ?>
-            <h3 class="underlined-title">
+            <h3 class="">
                 Todas las secciones del sitio.
             </h3>
         <?php elseif($page->template == "seccion"):?>
             <h3 class="">
-                Estas viendo la sección de: <span class=""><?php echo $page->title ?></span>
+                Estas viendo la sección de: <span class="light-header"><?php echo $page->title ?></span>
             </h3>
         <?php  elseif($page->template == "search"): ?>
-            <h3 class="underlined-title">
+            <h3 class="">
                 Encontramos <span class="visiting-section-tag"><?=$articles->getTotal()?></span> resultados para la búsqueda "<?=$input->get->q?>"
             </h3>
         <?php endif ?>

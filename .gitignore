@@ -1,5 +1,6 @@
 site/assets
 site/config.php
+site/templates/css/build.css
 .idea
 vendor
 /**/.DS_Store

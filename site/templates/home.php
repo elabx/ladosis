@@ -39,7 +39,7 @@ $configuracion = $pages->get("name=configuracion");
 		</div>
 
 <!--otras notas-->
-	<div class="uk-container uk-margin-top ">
+	<div class="uk-container uk-margin-large-top ">
 		<h3 class="light-header ">Otras notas y artículos</h3>
 		<hr>
 	</div>
@@ -76,7 +76,7 @@ $configuracion = $pages->get("name=configuracion");
 	</div>
 
 <!--Notas recientes-->
-	<div class="uk-container uk-margin-large-top ">
+	<div class="uk-container uk-margin-top ">
 		<h3 class="light-header ">Notas recientes:</h3>
 		<hr>
 	</div>
@@ -104,7 +104,7 @@ $configuracion = $pages->get("name=configuracion");
 												'more' => '...'
 											)); ?>
 										</p>
-										<a class=" uk-flex uk-flex-right" href="<?php echo $article->url ?>">Leer más &#10161;</a>
+										<a class="read-more uk-flex uk-flex-right" href="<?php echo $article->url ?>">Leer más &#10161;</a>
 									</div>
 								</div>
 							</li>
@@ -121,7 +121,7 @@ $configuracion = $pages->get("name=configuracion");
 	</div>
 
 <!--lo mas popular-->
-	<div class="uk-container uk-margin-large-top ">
+	<div class="uk-container uk-margin-top ">
 		<h3 class="light-header ">Lo más popular:</h3>
 		<hr>
 	</div>
@@ -150,15 +150,17 @@ $configuracion = $pages->get("name=configuracion");
 												'more' => '...'
 											)); ?>
 										</p>
-										<a class=" uk-flex uk-flex-right" href="<?php echo $article->url ?>">Leer más &#10161;</a>
+										<a class="read-more uk-flex uk-flex-right" href="<?php echo $article->url ?>">Leer más &#10161;</a>
 									</div>
 								</div>
 							</li>
 						<?php endforeach; ?>
 					</ul>
 				</div>
-				<a class="uk-position-center-left-out uk-dark" href="#" uk-slidenav-previous uk-slider-item="previous"></a>
-				<a class="uk-position-center-right-out uk-dark" href="#" uk-slidenav-next uk-slider-item="next"></a>
+				<div class="uk-visible@s">
+					<a class="uk-position-center-left-out uk-dark" href="#" uk-slidenav-previous uk-slider-item="previous"></a>
+					<a class="uk-position-center-right-out uk-dark" href="#" uk-slidenav-next uk-slider-item="next"></a>
+				</div>
 			</div>
 			<ul class="uk-slider-nav uk-dotnav uk-flex-center uk-margin"></ul>
 		</div>

@@ -34,9 +34,6 @@ p, ul, li{
     width:100%;
 }
 
-.titulo {
-    color: darkgreen;
-}
 
 .article-published-date{
     font-size:14px;
@@ -187,6 +184,12 @@ p, ul, li{
 .navbar-ladosis{
     background: none;
     border: 1px solid darkgreen;
+}
+
+.footer-links{
+    font-family:Oswald;
+    font-size:1.3em;
+    color:darkgreen;
 }
 
 /*
