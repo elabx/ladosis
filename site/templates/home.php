@@ -81,37 +81,40 @@ $configuracion = $pages->get("name=configuracion");
 		<hr>
 	</div>
 
-	<div class="uk-container uk-margin-top">
-		<div class="uk-container uk-slider-container" uk-slider>
+	<div class="uk-container  uk-margin-top">
+		<div class=" " uk-slider>
 			<div class="uk-position-relative" tabindex="-1" >
-				<ul class="uk-slider-items uk-child-width-1-4@m uk-grid-match uk-grid">
-					<?php foreach($pages->find("template=articulo|carton, sort=-published, limit=5") as $article): ?>
-						<li>
-							<div class="uk-card  uk-card-small">
-								<div class="uk-card-media-top uk-cover-container uk-height-small">
-									<img src="<?php echo $article->article_images->first()->media->size(300, 150)->url; ?>"
-										 alt="" uk-cover>
-								</div>
+				<div class="uk-slider-container">
+					<ul class="uk-slider-items uk-child-width-1-4@m uk-grid-match uk-grid">
+						<?php foreach($pages->find("template=articulo|carton, sort=-published, limit=5") as $article): ?>
+							<li>
+								<div class="uk-card  uk-card-small">
+									<div class="uk-card-media-top uk-cover-container uk-height-small">
+										<img src="<?php echo $article->article_images->first()->media->size(300, 150)->url; ?>"
+											 alt="" uk-cover>
+									</div>
 
-								<div class="uk-card-body">
-									<a href="<?php echo $article->url ?>"><h3 class="titulo uk-text-small uk-text-bolder uk-card-title"><?php echo $article->title ?></h3></a>
-									<p class="uk-text-small">
-										<?= $sanitizer->truncate($article->body, array(
-											'type' => 'punctuation',
-											'maxLength' => 150,
-											'visible' => true,
-											'more' => '...'
-										)); ?>
-									</p>
-									<a class=" uk-flex uk-flex-right" href="<?php echo $article->url ?>">Leer más &#10161;</a>
+									<div class="uk-card-body">
+										<a href="<?php echo $article->url ?>"><h3 class="titulo uk-text-small uk-text-bolder uk-card-title"><?php echo $article->title ?></h3></a>
+										<p class="uk-text-small">
+											<?= $sanitizer->truncate($article->body, array(
+												'type' => 'punctuation',
+												'maxLength' => 150,
+												'visible' => true,
+												'more' => '...'
+											)); ?>
+										</p>
+										<a class=" uk-flex uk-flex-right" href="<?php echo $article->url ?>">Leer más &#10161;</a>
+									</div>
 								</div>
-							</div>
-
-						</li>
-					<?php endforeach; ?>
-				</ul>
-				<a class="uk-position-center-left uk-position-medium uk-dark" href="#" uk-slidenav-previous uk-slider-item="previous"></a>
-				<a class="uk-position-center-right uk-position-medium uk-dark" href="#" uk-slidenav-next uk-slider-item="next"></a>
+							</li>
+						<?php endforeach; ?>
+					</ul>
+				</div>
+				<div class="uk-visible@s">
+					<a class="uk-position-center-left-out uk-position-small" href uk-slidenav-previous uk-slider-item="previous"></a>
+					<a class="uk-position-center-right-out uk-position-small" href uk-slidenav-next uk-slider-item="next"></a>
+				</div>
 			</div>
 			<ul class="uk-slider-nav uk-dotnav uk-flex-center uk-margin"></ul>
 		</div>
@@ -124,39 +127,38 @@ $configuracion = $pages->get("name=configuracion");
 	</div>
 
 	<div class="uk-container uk-margin-top">
+		<div class="" uk-slider>
+			<div class="uk-position-relative" tabindex="-1">
+				<div class="uk-slider-container">
+					<ul class="uk-slider-items uk-child-width-1-4@m uk-grid-match uk-grid">
 
-		<div class="uk-slider-container" uk-slider>
-			<div class="uk-position-relative" tabindex="-1" >
-				<ul class="uk-slider-items uk-child-width-1-4@m uk-grid-match uk-grid">
+						<?php foreach ($configuracion->featured as $article): ?>
+							<li>
+								<div class="uk-card uk-card-small">
+									<div class="uk-card-media-top uk-cover-container uk-height-small">
+										<img src="<?php echo $article->article_images->first()->media->size(300, 150)->url; ?>"
+											 alt="" uk-cover>
+									</div>
 
-					<?php foreach ($configuracion->featured as $article): ?>
-						<li>
-
-							<div class="uk-card uk-card-small">
-								<div class="uk-card-media-top uk-cover-container uk-height-small">
-									<img src="<?php echo $article->article_images->first()->media->size(300, 150)->url; ?>"
-										 alt="" uk-cover>
+									<div class="uk-card-body">
+										<a href="<?php echo $article->url ?>"><h3 class="titulo uk-text-small uk-text-bolder uk-card-title"><?php echo $article->title ?></h3></a>
+										<p class="uk-text-small">
+											<?= $sanitizer->truncate($article->body, array(
+												'type' => 'punctuation',
+												'maxLength' => 150,
+												'visible' => true,
+												'more' => '...'
+											)); ?>
+										</p>
+										<a class=" uk-flex uk-flex-right" href="<?php echo $article->url ?>">Leer más &#10161;</a>
+									</div>
 								</div>
-
-								<div class="uk-card-body">
-									<a href="<?php echo $article->url ?>"><h3 class="titulo uk-text-small uk-text-bolder uk-card-title"><?php echo $article->title ?></h3></a>
-									<p class="uk-text-small">
-										<?= $sanitizer->truncate($article->body, array(
-											'type' => 'punctuation',
-											'maxLength' => 150,
-											'visible' => true,
-											'more' => '...'
-										)); ?>
-									</p>
-									<a class=" uk-flex uk-flex-right" href="<?php echo $article->url ?>">Leer más &#10161;</a>
-								</div>
-							</div>
-
-						</li>
-					<?php endforeach; ?>
-				</ul>
-				<a class="uk-position-center-left uk-position-medium uk-dark" href="#" uk-slidenav-previous uk-slider-item="previous"></a>
-				<a class="uk-position-center-right uk-position-medium uk-dark" href="#" uk-slidenav-next uk-slider-item="next"></a>
+							</li>
+						<?php endforeach; ?>
+					</ul>
+				</div>
+				<a class="uk-position-center-left-out uk-dark" href="#" uk-slidenav-previous uk-slider-item="previous"></a>
+				<a class="uk-position-center-right-out uk-dark" href="#" uk-slidenav-next uk-slider-item="next"></a>
 			</div>
 			<ul class="uk-slider-nav uk-dotnav uk-flex-center uk-margin"></ul>
 		</div>
