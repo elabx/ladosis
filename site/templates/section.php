@@ -17,9 +17,9 @@ if($page->template == "search"){
                 Todas las secciones del sitio.
             </h3>
         <?php elseif($page->template == "seccion"):?>
-            <h3 class="">
+            <h5 class="">
                 Estas viendo la sección de: <span class="light-header"><?php echo $page->title ?></span>
-            </h3>
+            </h5>
         <?php  elseif($page->template == "search"): ?>
             <h3 class="">
                 Encontramos <span class="visiting-section-tag"><?=$articles->getTotal()?></span> resultados para la búsqueda "<?=$input->get->q?>"
@@ -46,7 +46,7 @@ if($page->template == "search"){
 
 
         <?php foreach($articles as $article): ?>
-            <div class="uk-margin-top-large uk-width-1-2@m">
+            <div class="uk-width-1-2@m">
                 <article class=" ">
                     <div class="uk-card uk-card-body uk-card uk-card-hover uk-border-rounded">
                         <a href="<?php echo $article->url ?>">
@@ -85,7 +85,7 @@ if($page->template == "search"){
 
                         <?php if($article->tags): ?>
                             <?php if($article->tags->count): ?>
-                                <ul class="tag-list uk-list-inline uk-margin-large-bottom">
+                                <ul class="tag-list uk-list-inline">
                                     <?php foreach($article->tags as $tag): ?>
                                         <li><a href="<?php echo $tag->url ?>"><?php echo $tag->title ?></a></li>
                                     <?php endforeach ?>
