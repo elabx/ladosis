@@ -18,7 +18,6 @@
 
             <p class="article-published-date">
                 <?php
-                //echo  locale_get_default();
                 if($page->date){
                     echo "Publicado el " .  strftime('%e de %B de %Y', $page->getUnformatted('date'));
                 } else {
@@ -99,12 +98,9 @@
 
         <div class="uk-child-width-expand"uk-grid>
             <div class="">
-                <h2>
-                    <a href="<?php echo $page->next->httpUrl?>">
-                        <?php echo $page->next->title ?>
+                    <a class="titulo" href="<?php echo $page->next->httpUrl?>">
+                        <h3><?php echo $page->next->title ?> </h3>
                     </a>
-                </h2>
-                <p>
                 <p>
                     <?= $sanitizer->truncate($page->next->body, array(
                         'type' => 'punctuation',
@@ -112,16 +108,16 @@
                         'visible' => true,
                         'more' => '...'
                     ));
-                    bd($page->next->body); ?>
+                    ?>
                 </p>
                 <a class="read-more" href="<?php echo $article->url ?>">Leer más &#10161;</a>
-                </p>
+
             </div>
             <div class="">
-                <h2>
-                    <a href="<?php echo $page->prev->httpUrl?>"><?php echo $page->prev->title ?>
+
+                    <a class="titulo" href="<?php echo $page->prev->httpUrl?>">
+                        <h3><?php echo $page->prev->title ?></h3>
                     </a>
-                </h2>
                 <p>
                     <?= $sanitizer->truncate($page->prev->body, array(
                         'type' => 'punctuation',
